@@ -75,6 +75,12 @@ public class ProductosController : ControllerBase
     public async Task<ActionResult<ProductoDto>> AjustarStock(string id, AjusteStockInput input, CancellationToken ct)
         => Ok(await _productos.AjustarStockAsync(id, input, ct));
 
+    /// <summary>Agrega un color (con tallas, stock y fotos) a un producto existente. Crea variantes nuevas.</summary>
+    [HttpPost("{id}/colores")]
+    [Authorize(Roles = "duena,cajera")]
+    public async Task<ActionResult<ProductoDto>> AgregarColor(string id, AgregarColorInput input, CancellationToken ct)
+        => Ok(await _productos.AgregarColorAsync(id, input, ct));
+
     /// <summary>Baja lógica de la prenda (deja de verse en el catálogo).</summary>
     [HttpDelete("{id}")]
     [Authorize(Roles = "duena")]

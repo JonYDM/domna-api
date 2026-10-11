@@ -139,6 +139,49 @@ public partial class Producto
         Nombre = n;
     }
 
+    /// <summary>
+    /// Agrega un color nuevo al producto con sus variantes (color × tallas), su stock por sucursal
+    /// y sus fotos. Usado por el edit ("Agregar color" tipo Zara). Rechaza colores/tallas duplicados.
+    /// </summary>
+    public void AgregarColor(
+        ColorDraft color,
+        IReadOnlyList<string> tallas,
+        IReadOnlyDictionary<SucursalId, IReadOnlyDictionary<string, int[]>> stock,
+        IReadOnlyList<string> fotos,
+        DateTime ahora,
+        Func<string>? nuevoIdColor = null,
+        Func<string>? nuevoIdVariante = null)
+    {
+        if (tallas.Count == 0)
+            throw DomnaException.BadRequest("Agrega al menos una talla para el color.");
+        if (_colores.Any(c => string.Equals(c.Nombre, color.Nombre.Trim(), StringComparison.OrdinalIgnoreCase)))
+            throw DomnaException.Conflict($"El color «{color.Nombre}» ya existe en esta prenda.");
+
+        var idColor = nuevoIdColor ?? (() => Guid.NewGuid().ToString("N")[..8]);
+        var idVariante = nuevoIdVariante ?? (() => Guid.NewGuid().ToString("N")[..8]);
+
+        var nuevo = new ColorProducto(idColor(), Id, color.Nombre, color.Hex, color.Familia);
+        _colores.Add(nuevo);
+
+        var slug = Slug(Nombre);
+        foreach (var talla in tallas)
+        {
+            var tStock = stock.TryGetValue(SucursalId.Temixco, out var t) && t.TryGetValue(talla, out var at) && at.Length > 0 ? at[0] : 0;
+            var aStock = stock.TryGetValue(SucursalId.Azteca, out var a) && a.TryGetValue(talla, out var aa) && aa.Length > 0 ? aa[0] : 0;
+            var sku = $"{slug}-{Slug(talla)}-{Slug(nuevo.Nombre)}".ToUpperInvariant();
+            _variantes.Add(new Variante(idVariante(), Id, talla, nuevo.Id, sku, tStock, aStock));
+        }
+
+        // Fotos del nuevo color, continuando el orden global.
+        var orden = _imagenes.Count;
+        foreach (var url in fotos)
+            _imagenes.Add(new ImagenProducto(Id, url, orden++, nuevo.Id));
+
+        // Si una variante nueva nace con stock y antes no había de ese color, cuenta como novedad de stock.
+        if (_variantes.Any(v => v.ColorId == nuevo.Id && v.StockTotal > 0))
+            ReabastecidoEl = ahora;
+    }
+
     public void CambiarDescripcion(string? descripcion) =>
         Descripcion = (descripcion ?? string.Empty).Trim();
 

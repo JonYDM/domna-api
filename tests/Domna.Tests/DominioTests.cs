@@ -175,4 +175,42 @@ public class DominioTests
         p.Desactivar();
         Assert.False(p.Activo);
     }
+
+    [Fact]
+    public void AgregarColor_crea_variantes_y_fotos_del_color()
+    {
+        var p = CrearPrenda(); // tiene Rosa y Azul, tallas CH y M
+        var antesVariantes = p.Variantes.Count;
+
+        p.AgregarColor(
+            new ColorDraft("Verde", "#5E7A4E", FamiliaColor.Verde),
+            new[] { "CH", "M" },
+            new Dictionary<SucursalId, IReadOnlyDictionary<string, int[]>>
+            {
+                [SucursalId.Temixco] = new Dictionary<string, int[]> { ["CH"] = new[] { 4 }, ["M"] = new[] { 2 } },
+                [SucursalId.Azteca] = new Dictionary<string, int[]> { ["CH"] = new[] { 0 }, ["M"] = new[] { 1 } },
+            },
+            new[] { "https://cdn/verde-1.webp", "https://cdn/verde-2.webp" },
+            Ahora);
+
+        Assert.Equal(3, p.Colores.Count);
+        Assert.Equal(antesVariantes + 2, p.Variantes.Count); // +2 tallas del nuevo color
+        var verde = p.Colores.First(c => c.Nombre == "Verde");
+        Assert.Equal(2, p.Imagenes.Count(i => i.ColorId == verde.Id));
+        var chVerde = p.Variantes.First(v => v.ColorId == verde.Id && v.Talla == "CH");
+        Assert.Equal(4, chVerde.StockDe(SucursalId.Temixco));
+    }
+
+    [Fact]
+    public void AgregarColor_rechaza_color_duplicado()
+    {
+        var p = CrearPrenda();
+        var ex = Assert.Throws<DomnaException>(() => p.AgregarColor(
+            new ColorDraft("Rosa", "#F2A7B5", FamiliaColor.Rosa),
+            new[] { "CH" },
+            new Dictionary<SucursalId, IReadOnlyDictionary<string, int[]>>(),
+            new string[0],
+            Ahora));
+        Assert.Equal(409, ex.StatusCode);
+    }
 }

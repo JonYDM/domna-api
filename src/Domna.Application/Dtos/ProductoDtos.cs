@@ -58,8 +58,11 @@ public record NuevoProductoInput(
     Dictionary<string, string?[]>? CodigoBarras,
     List<ImagenInputDto>? Imagenes = null);
 
-/// <summary>Una foto a guardar en el producto (URL pública en R2, opcionalmente ligada a un color).</summary>
-public record ImagenInputDto(string Url, string? ColorId);
+/// <summary>
+/// Una foto a guardar (URL pública en R2). Se liga a un color por su ÍNDICE en la lista `Colores`
+/// del input (el front no conoce los ids que el backend genera). `Orden` ordena las fotos del color.
+/// </summary>
+public record ImagenInputDto(string Url, int? ColorIndex, int Orden);
 
 /// <summary>Edición de los campos simples de la prenda (no toca variantes/stock).</summary>
 public record EditarProductoInput(
@@ -75,3 +78,13 @@ public record AjusteStockInput(string VarianteId, string Sucursal, int Nuevo);
 
 /// <summary>Petición para firmar la subida de las fotos de un producto a R2.</summary>
 public record FirmarImagenesInput(string ProductoId, List<string>? Tamanos, string? ContentType);
+
+/// <summary>
+/// Agregar un color a un producto existente, con sus tallas, stock por sucursal y fotos.
+/// stock[sucursal][talla] = arreglo de 1 (el stock de esa talla en ese color).
+/// </summary>
+public record AgregarColorInput(
+    ColorInputDto Color,
+    List<string> Tallas,
+    Dictionary<string, Dictionary<string, int[]>> Stock,
+    List<string>? Fotos);

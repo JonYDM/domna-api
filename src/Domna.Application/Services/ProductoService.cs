@@ -85,13 +85,21 @@ public class ProductoService : IProductoService
             _reloj.Ahora,
             codigos);
 
-        // Fotos (URLs públicas ya subidas a R2 por el front). El colorId solo se conserva si
-        // corresponde a un color real del producto; si no, la imagen queda como galería general.
+        // Fotos (URLs públicas ya subidas a R2 por el front). Se ligan al color por su índice en
+        // la lista de colores del input (mismo orden con el que el producto creó sus colores).
         if (input.Imagenes is { Count: > 0 })
         {
-            var colorIdsValidos = producto.Colores.Select(c => c.Id).ToHashSet();
-            producto.FijarImagenes(input.Imagenes.Select(i =>
-                (i.Url, i.ColorId is not null && colorIdsValidos.Contains(i.ColorId) ? i.ColorId : null)));
+            var coloresProducto = producto.Colores; // mismo orden que input.Colores
+            producto.FijarImagenes(
+                input.Imagenes
+                    .OrderBy(i => i.Orden)
+                    .Select(i =>
+                    {
+                        var colorId = i.ColorIndex is int idx && idx >= 0 && idx < coloresProducto.Count
+                            ? coloresProducto[idx].Id
+                            : (string?)null;
+                        return (i.Url, colorId);
+                    }));
         }
 
         await _productos.AgregarAsync(producto, ct);
@@ -121,6 +129,37 @@ public class ProductoService : IProductoService
             ?? throw DomnaException.NotFound("Prenda no encontrada.");
 
         p.AjustarStock(input.VarianteId, EnumMap.Sucursal(input.Sucursal), input.Nuevo, _reloj.Ahora);
+        await _productos.GuardarAsync(ct);
+        return p.ToDto();
+    }
+
+    public async Task<ProductoDto> AgregarColorAsync(string id, AgregarColorInput input, CancellationToken ct = default)
+    {
+        var p = await _productos.ObtenerPorIdAsync(id, ct)
+            ?? throw DomnaException.NotFound("Prenda no encontrada.");
+
+        // Las tallas deben pertenecer a la categoría del producto.
+        var categoria = await _categorias.ObtenerPorIdAsync(p.CategoriaId, ct);
+        var tallasNorm = Atributos.NormalizarTallas(input.Tallas);
+        if (categoria is not null)
+        {
+            var ajenas = tallasNorm.Where(t => !categoria.TieneTalla(t)).ToList();
+            if (ajenas.Count > 0)
+                throw DomnaException.BadRequest(
+                    $"Estas tallas no pertenecen a la categoría «{categoria.Nombre}»: {string.Join(", ", ajenas)}.");
+        }
+
+        var stock = new Dictionary<SucursalId, IReadOnlyDictionary<string, int[]>>();
+        foreach (var (sucStr, porTalla) in input.Stock)
+            stock[EnumMap.Sucursal(sucStr)] = porTalla;
+
+        p.AgregarColor(
+            new ColorDraft(input.Color.Nombre, input.Color.Hex, EnumMap.Familia(input.Color.Familia)),
+            tallasNorm,
+            stock,
+            input.Fotos ?? new List<string>(),
+            _reloj.Ahora);
+
         await _productos.GuardarAsync(ct);
         return p.ToDto();
     }
