@@ -158,10 +158,8 @@ public partial class Producto
                 var aStock = stock.TryGetValue(SucursalId.Azteca, out var azteca)
                     && azteca.TryGetValue(talla, out var arrA) && ci < arrA.Length ? arrA[ci] : 0;
 
-                string? codigo = null;
-                if (codigoBarras is not null
-                    && codigoBarras.TryGetValue(talla, out var arrCb) && ci < arrCb.Length)
-                    codigo = arrCb[ci];
+                // El código del QR lo genera SIEMPRE el servidor (nunca se teclea ni se recibe).
+                var codigo = GenerarCodigo();
 
                 var sku = $"{slug}-{Slug(talla)}-{Slug(color.Nombre)}".ToUpperInvariant();
                 p._variantes.Add(new Variante(idVariante(), id, talla, color.Id, sku, tStock, aStock, codigo));
@@ -209,7 +207,7 @@ public partial class Producto
             var tStock = stock.TryGetValue(SucursalId.Temixco, out var t) && t.TryGetValue(talla, out var at) && at.Length > 0 ? at[0] : 0;
             var aStock = stock.TryGetValue(SucursalId.Azteca, out var a) && a.TryGetValue(talla, out var aa) && aa.Length > 0 ? aa[0] : 0;
             var sku = $"{slug}-{Slug(talla)}-{Slug(nuevo.Nombre)}".ToUpperInvariant();
-            _variantes.Add(new Variante(idVariante(), Id, talla, nuevo.Id, sku, tStock, aStock));
+            _variantes.Add(new Variante(idVariante(), Id, talla, nuevo.Id, sku, tStock, aStock, GenerarCodigo()));
         }
 
         // Fotos del nuevo color, continuando el orden global.
@@ -279,6 +277,16 @@ public partial class Producto
         }
         var limpio = NoAlfaNum().Replace(sb.ToString(), "-").Trim('-');
         return limpio.Length == 0 ? "x" : limpio;
+    }
+
+    /// <summary>
+    /// Genera un código único por variante para el QR (ya no se teclea). Formato corto y escaneable:
+    /// "DMN-" + 10 chars base36 de un GUID. Único en la práctica; el POS lo busca tal cual.
+    /// </summary>
+    private static string GenerarCodigo()
+    {
+        var g = Guid.NewGuid().ToString("N").ToUpperInvariant();
+        return $"DMN-{g[..10]}";
     }
 
     [GeneratedRegex(@"[^a-zA-Z0-9]+")]

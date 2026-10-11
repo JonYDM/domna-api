@@ -53,7 +53,10 @@ public class ProductoServiceTests
         Assert.Equal(4, dto.Variantes.Count); // 2 tallas × 2 colores
         Assert.Equal(2, dto.Colores.Count);
         Assert.Equal("vestido", dto.Silueta);
-        var chRosa = dto.Variantes.First(v => v.CodigoBarras == "7501000000011");
+        // Toda variante trae su código autogenerado por el servidor.
+        Assert.All(dto.Variantes, v => Assert.StartsWith("DMN-", v.CodigoBarras!));
+        var rosaId = dto.Colores.First(c => c.Nombre == "Rosa").Id;
+        var chRosa = dto.Variantes.First(v => v.Talla == "CH" && v.ColorId == rosaId);
         Assert.Equal(3, chRosa.Stock["temixco"]);
         Assert.Equal(0, chRosa.Stock["azteca"]);
     }
@@ -83,10 +86,11 @@ public class ProductoServiceTests
     {
         var repo = new ProductoRepoFake();
         var svc = Crear(repo);
-        await svc.CrearAsync(NuevoVestido());
+        var creado = await svc.CrearAsync(NuevoVestido());
+        var codigo = creado.Variantes[0].CodigoBarras!; // autogenerado por el servidor
 
-        var dto = await svc.BuscarPorCodigoBarrasAsync("7501000000042");
-        Assert.Equal("Vestido Primavera", dto.Nombre);
+        var dto = await svc.BuscarPorCodigoBarrasAsync(codigo);
+        Assert.Equal(creado.Nombre, dto.Nombre);
     }
 
     [Fact]

@@ -121,12 +121,12 @@ public class DominioTests
     }
 
     [Fact]
-    public void Crear_asigna_codigos_de_barras_por_variante()
+    public void Crear_ignora_codigos_capturados_y_autogenera()
     {
+        // Aunque se "pasen" códigos, el servidor SIEMPRE genera el suyo (ya no se teclea).
         var p = CrearPrenda(conCodigos: true);
-        var v = p.BuscarPorCodigoBarras("222");
-        Assert.NotNull(v);
-        Assert.Equal("CH", v!.Talla);
+        Assert.Null(p.BuscarPorCodigoBarras("222")); // el capturado no se usa
+        Assert.All(p.Variantes, v => Assert.StartsWith("DMN-", v.CodigoBarras!));
     }
 
     [Fact]
@@ -165,6 +165,34 @@ public class DominioTests
         var p = CrearPrenda();
         var v = p.Variantes.First();
         Assert.Throws<DomnaException>(() => p.AjustarStock(v.Id, SucursalId.Temixco, -1, Ahora));
+    }
+
+    [Fact]
+    public void Crear_autogenera_codigo_unico_en_cada_variante()
+    {
+        var p = CrearPrenda(); // sin pasar códigos
+        Assert.All(p.Variantes, v => Assert.False(string.IsNullOrWhiteSpace(v.CodigoBarras)));
+        var codigos = p.Variantes.Select(v => v.CodigoBarras).ToList();
+        Assert.Equal(codigos.Count, codigos.Distinct().Count()); // todos únicos
+        Assert.All(p.Variantes, v => Assert.StartsWith("DMN-", v.CodigoBarras!));
+    }
+
+    [Fact]
+    public void AgregarColor_autogenera_codigo_en_sus_variantes()
+    {
+        var p = CrearPrenda();
+        p.AgregarColor(
+            new ColorDraft("Verde", "#5E7A4E", FamiliaColor.Verde),
+            new[] { "CH", "M" },
+            new Dictionary<SucursalId, IReadOnlyDictionary<string, int[]>>
+            {
+                [SucursalId.Temixco] = new Dictionary<string, int[]> { ["CH"] = new[] { 1 }, ["M"] = new[] { 1 } },
+            },
+            new string[0],
+            Ahora);
+        var verde = p.Colores.First(c => c.Nombre == "Verde");
+        var variantesVerde = p.Variantes.Where(v => v.ColorId == verde.Id).ToList();
+        Assert.All(variantesVerde, v => Assert.False(string.IsNullOrWhiteSpace(v.CodigoBarras)));
     }
 
     [Fact]
