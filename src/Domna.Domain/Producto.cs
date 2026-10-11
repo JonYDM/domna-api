@@ -42,6 +42,46 @@ public partial class Producto
             _imagenes.Add(new ImagenProducto(Id, url, i++, colorId));
     }
 
+    /// <summary>Cuántas fotos tiene un color.</summary>
+    public int FotosDeColor(string colorId) => _imagenes.Count(i => i.ColorId == colorId);
+
+    /// <summary>Quita UNA foto por su URL. No valida reglas de "última foto" (eso lo decide el caso de uso).</summary>
+    public void QuitarImagen(string url)
+    {
+        var img = _imagenes.FirstOrDefault(i => i.Url == url)
+            ?? throw DomnaException.NotFound("Esa foto no existe en la prenda.");
+        _imagenes.Remove(img);
+    }
+
+    /// <summary>Agrega fotos (URLs ya subidas) a un color existente, continuando el orden.</summary>
+    public void AgregarImagenesAColor(string colorId, IEnumerable<string> urls)
+    {
+        if (_colores.All(c => c.Id != colorId))
+            throw DomnaException.NotFound("El color no existe en la prenda.");
+        var orden = _imagenes.Count;
+        foreach (var url in urls)
+            _imagenes.Add(new ImagenProducto(Id, url, orden++, colorId));
+    }
+
+    /// <summary>
+    /// Quita un color de la prenda: sus variantes y sus fotos. Lo usa "quitar la última foto de un
+    /// color". `tieneApartados` lo decide el caso de uso (cuando exista el módulo de apartados); si es
+    /// true, no se puede borrar para no romper pedidos. Debe quedar al menos un color.
+    /// </summary>
+    public void QuitarColor(string colorId, bool tieneApartados)
+    {
+        var color = _colores.FirstOrDefault(c => c.Id == colorId)
+            ?? throw DomnaException.NotFound("El color no existe en la prenda.");
+        if (_colores.Count <= 1)
+            throw DomnaException.Conflict("No puedes quitar el único color de la prenda.");
+        if (tieneApartados)
+            throw DomnaException.Conflict("Este color tiene apartados activos; no se puede quitar.");
+
+        _variantes.RemoveAll(v => v.ColorId == colorId);
+        _imagenes.RemoveAll(i => i.ColorId == colorId);
+        _colores.Remove(color);
+    }
+
     /// <summary>Tallas únicas de las variantes (en el orden en que se dieron de alta).</summary>
     public IReadOnlyList<string> Tallas => _variantes.Select(v => v.Talla).Distinct().ToList();
 

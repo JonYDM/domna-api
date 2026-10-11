@@ -81,6 +81,24 @@ public class ProductosController : ControllerBase
     public async Task<ActionResult<ProductoDto>> AgregarColor(string id, AgregarColorInput input, CancellationToken ct)
         => Ok(await _productos.AgregarColorAsync(id, input, ct));
 
+    /// <summary>Quita una foto de la galería por su URL.</summary>
+    [HttpDelete("{id}/imagenes")]
+    [Authorize(Roles = "duena,cajera")]
+    public async Task<ActionResult<ProductoDto>> QuitarImagen(string id, QuitarImagenInput input, CancellationToken ct)
+        => Ok(await _productos.QuitarImagenAsync(id, input.Url, ct));
+
+    /// <summary>Agrega fotos (URLs ya subidas) a un color existente.</summary>
+    [HttpPost("{id}/colores/{colorId}/imagenes")]
+    [Authorize(Roles = "duena,cajera")]
+    public async Task<ActionResult<ProductoDto>> AgregarImagenesColor(string id, string colorId, AgregarImagenesInput input, CancellationToken ct)
+        => Ok(await _productos.AgregarImagenesColorAsync(id, colorId, input.Urls, ct));
+
+    /// <summary>Quita un color de la prenda (con sus variantes y fotos). Falla si tiene apartados activos.</summary>
+    [HttpDelete("{id}/colores/{colorId}")]
+    [Authorize(Roles = "duena,cajera")]
+    public async Task<ActionResult<ProductoDto>> QuitarColor(string id, string colorId, CancellationToken ct)
+        => Ok(await _productos.QuitarColorAsync(id, colorId, ct));
+
     /// <summary>Baja lógica de la prenda (deja de verse en el catálogo).</summary>
     [HttpDelete("{id}")]
     [Authorize(Roles = "duena")]

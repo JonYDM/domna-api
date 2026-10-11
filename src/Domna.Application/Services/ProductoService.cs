@@ -164,6 +164,35 @@ public class ProductoService : IProductoService
         return p.ToDto();
     }
 
+    public async Task<ProductoDto> QuitarImagenAsync(string id, string url, CancellationToken ct = default)
+    {
+        var p = await _productos.ObtenerPorIdAsync(id, ct)
+            ?? throw DomnaException.NotFound("Prenda no encontrada.");
+        p.QuitarImagen(url);
+        await _productos.GuardarAsync(ct);
+        return p.ToDto();
+    }
+
+    public async Task<ProductoDto> AgregarImagenesColorAsync(string id, string colorId, List<string> urls, CancellationToken ct = default)
+    {
+        var p = await _productos.ObtenerPorIdAsync(id, ct)
+            ?? throw DomnaException.NotFound("Prenda no encontrada.");
+        p.AgregarImagenesAColor(colorId, urls);
+        await _productos.GuardarAsync(ct);
+        return p.ToDto();
+    }
+
+    public async Task<ProductoDto> QuitarColorAsync(string id, string colorId, CancellationToken ct = default)
+    {
+        var p = await _productos.ObtenerPorIdAsync(id, ct)
+            ?? throw DomnaException.NotFound("Prenda no encontrada.");
+        // TODO(apartados): cuando exista el módulo de apartados en el backend, calcular aquí si el
+        // color tiene apartados activos y pasarlo. Hoy el backend no gestiona apartados ⇒ false.
+        p.QuitarColor(colorId, tieneApartados: false);
+        await _productos.GuardarAsync(ct);
+        return p.ToDto();
+    }
+
     public async Task DesactivarAsync(string id, CancellationToken ct = default)
     {
         var p = await _productos.ObtenerPorIdAsync(id, ct)

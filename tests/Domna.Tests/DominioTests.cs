@@ -213,4 +213,57 @@ public class DominioTests
             Ahora));
         Assert.Equal(409, ex.StatusCode);
     }
+
+    [Fact]
+    public void QuitarImagen_elimina_por_url()
+    {
+        var p = CrearPrenda();
+        var rosa = p.Colores.First(c => c.Nombre == "Rosa");
+        p.AgregarImagenesAColor(rosa.Id, new[] { "https://cdn/r1.webp", "https://cdn/r2.webp" });
+        Assert.Equal(2, p.FotosDeColor(rosa.Id));
+        p.QuitarImagen("https://cdn/r1.webp");
+        Assert.Equal(1, p.FotosDeColor(rosa.Id));
+    }
+
+    [Fact]
+    public void QuitarColor_elimina_variantes_y_fotos()
+    {
+        var p = CrearPrenda(); // Rosa, Azul
+        var azul = p.Colores.First(c => c.Nombre == "Azul");
+        p.AgregarImagenesAColor(azul.Id, new[] { "https://cdn/a1.webp" });
+        var variantesAntes = p.Variantes.Count;
+
+        p.QuitarColor(azul.Id, tieneApartados: false);
+
+        Assert.DoesNotContain(p.Colores, c => c.Id == azul.Id);
+        Assert.DoesNotContain(p.Variantes, v => v.ColorId == azul.Id);
+        Assert.DoesNotContain(p.Imagenes, i => i.ColorId == azul.Id);
+        Assert.True(p.Variantes.Count < variantesAntes);
+    }
+
+    [Fact]
+    public void QuitarColor_con_apartados_lanza_409()
+    {
+        var p = CrearPrenda();
+        var azul = p.Colores.First(c => c.Nombre == "Azul");
+        var ex = Assert.Throws<DomnaException>(() => p.QuitarColor(azul.Id, tieneApartados: true));
+        Assert.Equal(409, ex.StatusCode);
+    }
+
+    [Fact]
+    public void QuitarColor_unico_color_lanza_409()
+    {
+        // Prenda de un solo color.
+        var p = Producto.Crear("p", "Blusa", "d", "cat", Silueta.Blusa, 100m, 40m, true,
+            new[] { new ColorDraft("Rojo", "#C0283E", FamiliaColor.Rojo) },
+            new[] { "M" },
+            new Dictionary<SucursalId, IReadOnlyDictionary<string, int[]>>
+            {
+                [SucursalId.Temixco] = new Dictionary<string, int[]> { ["M"] = new[] { 1 } },
+            },
+            Ahora);
+        var unico = p.Colores[0];
+        var ex = Assert.Throws<DomnaException>(() => p.QuitarColor(unico.Id, tieneApartados: false));
+        Assert.Equal(409, ex.StatusCode);
+    }
 }

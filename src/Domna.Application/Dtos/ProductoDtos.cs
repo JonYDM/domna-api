@@ -88,3 +88,9 @@ public record AgregarColorInput(
     List<string> Tallas,
     Dictionary<string, Dictionary<string, int[]>> Stock,
     List<string>? Fotos);
+
+/// <summary>Quitar una foto de la galería por su URL pública.</summary>
+public record QuitarImagenInput(string Url);
+
+/// <summary>Agregar fotos (URLs ya subidas a R2) a un color existente.</summary>
+public record AgregarImagenesInput(List<string> Urls);

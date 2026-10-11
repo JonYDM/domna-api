@@ -24,6 +24,9 @@ public interface IProductoService
     Task<ProductoDto> EditarAsync(string id, EditarProductoInput input, CancellationToken ct = default);
     Task<ProductoDto> AjustarStockAsync(string id, AjusteStockInput input, CancellationToken ct = default);
     Task<ProductoDto> AgregarColorAsync(string id, AgregarColorInput input, CancellationToken ct = default);
+    Task<ProductoDto> QuitarImagenAsync(string id, string url, CancellationToken ct = default);
+    Task<ProductoDto> AgregarImagenesColorAsync(string id, string colorId, List<string> urls, CancellationToken ct = default);
+    Task<ProductoDto> QuitarColorAsync(string id, string colorId, CancellationToken ct = default);
     Task DesactivarAsync(string id, CancellationToken ct = default);
 }
 
