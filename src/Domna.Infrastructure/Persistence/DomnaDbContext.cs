@@ -17,6 +17,7 @@ public class DomnaDbContext : DbContext
     public DbSet<Producto> Productos => Set<Producto>();
     public DbSet<ColorProducto> Colores => Set<ColorProducto>();
     public DbSet<Variante> Variantes => Set<Variante>();
+    public DbSet<ImagenProducto> Imagenes => Set<ImagenProducto>();
     public DbSet<Categoria> Categorias => Set<Categoria>();
     public DbSet<ColorCatalogo> ColoresCatalogo => Set<ColorCatalogo>();
 
@@ -48,8 +49,10 @@ public class DomnaDbContext : DbContext
             // Colecciones del agregado: EF usa el campo de respaldo (lista privada).
             e.HasMany(x => x.Colores).WithOne().HasForeignKey(c => c.ProductoId);
             e.HasMany(x => x.Variantes).WithOne().HasForeignKey(v => v.ProductoId);
+            e.HasMany(x => x.Imagenes).WithOne().HasForeignKey(i => i.ProductoId);
             e.Navigation(x => x.Colores).UsePropertyAccessMode(PropertyAccessMode.Field);
             e.Navigation(x => x.Variantes).UsePropertyAccessMode(PropertyAccessMode.Field);
+            e.Navigation(x => x.Imagenes).UsePropertyAccessMode(PropertyAccessMode.Field);
         });
 
         b.Entity<ColorProducto>(e =>
@@ -62,6 +65,11 @@ public class DomnaDbContext : DbContext
         {
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.CodigoBarras);
+        });
+
+        b.Entity<ImagenProducto>(e =>
+        {
+            e.HasKey(x => x.Id);
         });
 
         b.Entity<Categoria>(e =>

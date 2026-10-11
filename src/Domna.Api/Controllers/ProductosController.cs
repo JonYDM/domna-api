@@ -1,3 +1,4 @@
+using Domna.Application.Abstractions;
 using Domna.Application.Dtos;
 using Domna.Application.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -14,8 +15,29 @@ namespace Domna.Api.Controllers;
 public class ProductosController : ControllerBase
 {
     private readonly IProductoService _productos;
+    private readonly IAlmacenamientoImagenes _imagenes;
 
-    public ProductosController(IProductoService productos) => _productos = productos;
+    public ProductosController(IProductoService productos, IAlmacenamientoImagenes imagenes)
+    {
+        _productos = productos;
+        _imagenes = imagenes;
+    }
+
+    /// <summary>
+    /// Firma la subida de las fotos de un producto a R2 (staff). El front sube los WebP directo al
+    /// bucket con las URLs PUT devueltas y luego guarda las URLs públicas en el producto.
+    /// </summary>
+    [HttpPost("imagenes/firmar")]
+    [Authorize(Roles = "duena,cajera")]
+    public ActionResult<FirmaSubida> FirmarImagenes(FirmarImagenesInput input)
+    {
+        if (!_imagenes.Disponible)
+            return StatusCode(503, new { mensaje = "El almacenamiento de imágenes no está configurado." });
+        var tamanos = (input.Tamanos is { Count: > 0 }) ? input.Tamanos : new List<string> { "400", "800", "1600" };
+        var firma = _imagenes.FirmarSubidaProducto(input.ProductoId, tamanos, input.ContentType ?? "image/webp");
+        return Ok(firma);
+    }
+
 
     /// <summary>Lista el catálogo. incluirInactivos=true solo para el panel de la dueña.</summary>
     [HttpGet]

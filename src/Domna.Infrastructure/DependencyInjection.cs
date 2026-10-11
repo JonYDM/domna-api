@@ -15,7 +15,8 @@ public static class DependencyInjection
         this IServiceCollection services,
         JwtOptions jwtOptions,
         CorreoOptions correoOptions,
-        string? connectionString = null)
+        string? connectionString = null,
+        R2Options? r2Options = null)
     {
         // PostgreSQL si hay cadena de conexión (producción/Railway); si no, InMemory (demo/local).
         var pg = NormalizarConexionPostgres(connectionString);
@@ -31,9 +32,11 @@ public static class DependencyInjection
 
         services.AddSingleton(jwtOptions);
         services.AddSingleton(correoOptions);
+        services.AddSingleton(r2Options ?? new R2Options());
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddSingleton<IJwtGenerator, JwtGenerator>();
         services.AddSingleton<IReloj, RelojSistema>();
+        services.AddSingleton<IAlmacenamientoImagenes, R2Almacenamiento>();
 
         // Correo real por SMTP si hay credenciales configuradas; si no, el simulado (solo loguea el token).
         if (correoOptions.Configurado)

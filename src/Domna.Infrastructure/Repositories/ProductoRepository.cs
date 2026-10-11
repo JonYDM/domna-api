@@ -15,6 +15,7 @@ public class ProductoRepository : IProductoRepository
         _db.Productos
             .Include(p => p.Colores)
             .Include(p => p.Variantes)
+            .Include(p => p.Imagenes)
             .FirstOrDefaultAsync(p => p.Id == id, ct);
 
     public async Task<List<Producto>> ListarAsync(bool incluirInactivos, CancellationToken ct = default)
@@ -22,6 +23,7 @@ public class ProductoRepository : IProductoRepository
         var q = _db.Productos
             .Include(p => p.Colores)
             .Include(p => p.Variantes)
+            .Include(p => p.Imagenes)
             .AsQueryable();
         if (!incluirInactivos)
             q = q.Where(p => p.Activo);

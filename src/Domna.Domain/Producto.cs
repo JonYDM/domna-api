@@ -13,6 +13,7 @@ public partial class Producto
 {
     private readonly List<ColorProducto> _colores = new();
     private readonly List<Variante> _variantes = new();
+    private readonly List<ImagenProducto> _imagenes = new();
 
     public string Id { get; private set; } = default!;
     public string Nombre { get; private set; } = default!;
@@ -30,6 +31,16 @@ public partial class Producto
 
     public IReadOnlyList<ColorProducto> Colores => _colores.AsReadOnly();
     public IReadOnlyList<Variante> Variantes => _variantes.AsReadOnly();
+    public IReadOnlyList<ImagenProducto> Imagenes => _imagenes.AsReadOnly();
+
+    /// <summary>Reemplaza las fotos del producto (URLs públicas en R2) en el orden dado.</summary>
+    public void FijarImagenes(IEnumerable<(string Url, string? ColorId)> imagenes)
+    {
+        _imagenes.Clear();
+        var i = 0;
+        foreach (var (url, colorId) in imagenes)
+            _imagenes.Add(new ImagenProducto(Id, url, i++, colorId));
+    }
 
     /// <summary>Tallas únicas de las variantes (en el orden en que se dieron de alta).</summary>
     public IReadOnlyList<string> Tallas => _variantes.Select(v => v.Talla).Distinct().ToList();

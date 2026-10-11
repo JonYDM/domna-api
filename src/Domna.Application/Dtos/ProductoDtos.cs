@@ -29,8 +29,12 @@ public record ProductoDto(
     List<ColorProductoDto> Colores,
     List<string> Tallas,
     List<VarianteDto> Variantes,
+    List<ImagenProductoDto> Imagenes,
     DateTime Creado,
     DateTime? ReabastecidoEl);
+
+/// <summary>Foto del producto (URL pública), opcionalmente ligada a un color.</summary>
+public record ImagenProductoDto(string Url, string? ColorId);
 
 /// <summary>Color al dar de alta (sin id; el servidor lo asigna).</summary>
 public record ColorInputDto(string Nombre, string Hex, string Familia);
@@ -51,7 +55,11 @@ public record NuevoProductoInput(
     List<string> Tallas,
     Dictionary<string, Dictionary<string, int[]>> Stock,
     bool PermiteApartado,
-    Dictionary<string, string?[]>? CodigoBarras);
+    Dictionary<string, string?[]>? CodigoBarras,
+    List<ImagenInputDto>? Imagenes = null);
+
+/// <summary>Una foto a guardar en el producto (URL pública en R2, opcionalmente ligada a un color).</summary>
+public record ImagenInputDto(string Url, string? ColorId);
 
 /// <summary>Edición de los campos simples de la prenda (no toca variantes/stock).</summary>
 public record EditarProductoInput(
@@ -64,3 +72,6 @@ public record EditarProductoInput(
 
 /// <summary>Ajuste de stock absoluto de una variante en una sucursal.</summary>
 public record AjusteStockInput(string VarianteId, string Sucursal, int Nuevo);
+
+/// <summary>Petición para firmar la subida de las fotos de un producto a R2.</summary>
+public record FirmarImagenesInput(string ProductoId, List<string>? Tamanos, string? ContentType);

@@ -53,6 +53,7 @@ public static class Mapper
         p.Colores.Select(c => c.ToDto()).ToList(),
         p.Tallas.ToList(),
         p.Variantes.Select(v => v.ToDto()).ToList(),
+        p.Imagenes.OrderBy(i => i.Orden).Select(i => new ImagenProductoDto(i.Url, i.ColorId)).ToList(),
         p.Creado,
         p.ReabastecidoEl);
 

@@ -147,6 +147,35 @@ namespace Domna.Infrastructure.Persistence.Migrations
                     b.ToTable("Colores");
                 });
 
+            modelBuilder.Entity("Domna.Domain.ImagenProducto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ColorId")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Orden")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProductoId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductoId");
+
+                    b.ToTable("Imagenes");
+                });
+
             modelBuilder.Entity("Domna.Domain.Producto", b =>
                 {
                     b.Property<string>("Id")
@@ -268,6 +297,15 @@ namespace Domna.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Domna.Domain.ImagenProducto", b =>
+                {
+                    b.HasOne("Domna.Domain.Producto", null)
+                        .WithMany("Imagenes")
+                        .HasForeignKey("ProductoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domna.Domain.Variante", b =>
                 {
                     b.HasOne("Domna.Domain.Producto", null)
@@ -280,6 +318,8 @@ namespace Domna.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Domna.Domain.Producto", b =>
                 {
                     b.Navigation("Colores");
+
+                    b.Navigation("Imagenes");
 
                     b.Navigation("Variantes");
                 });

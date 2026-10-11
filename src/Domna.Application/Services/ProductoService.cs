@@ -85,6 +85,15 @@ public class ProductoService : IProductoService
             _reloj.Ahora,
             codigos);
 
+        // Fotos (URLs públicas ya subidas a R2 por el front). El colorId solo se conserva si
+        // corresponde a un color real del producto; si no, la imagen queda como galería general.
+        if (input.Imagenes is { Count: > 0 })
+        {
+            var colorIdsValidos = producto.Colores.Select(c => c.Id).ToHashSet();
+            producto.FijarImagenes(input.Imagenes.Select(i =>
+                (i.Url, i.ColorId is not null && colorIdsValidos.Contains(i.ColorId) ? i.ColorId : null)));
+        }
+
         await _productos.AgregarAsync(producto, ct);
         await _productos.GuardarAsync(ct);
         return producto.ToDto();

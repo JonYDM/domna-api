@@ -24,6 +24,10 @@ builder.Configuration.GetSection("Jwt").Bind(jwtOptions);
 var correoOptions = new CorreoOptions();
 builder.Configuration.GetSection("Correo").Bind(correoOptions);
 
+// Opciones de R2 (sección "R2" / variables R2__*). Llaves secretas, solo en el servidor.
+var r2Options = new R2Options();
+builder.Configuration.GetSection("R2").Bind(r2Options);
+
 // Cadena de conexión: Railway/producción la inyecta como DATABASE_URL o ConnectionStrings__Default.
 // Si no hay, el backend corre con InMemory (demo/local).
 var connectionString =
@@ -32,7 +36,7 @@ var connectionString =
     ?? Environment.GetEnvironmentVariable("DATABASE_URL");
 
 // Capas Application + Infrastructure (Postgres si hay cadena, si no InMemory).
-builder.Services.AgregarDomna(jwtOptions, correoOptions, connectionString);
+builder.Services.AgregarDomna(jwtOptions, correoOptions, connectionString, r2Options);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -93,6 +97,9 @@ var app = builder.Build();
 app.Logger.LogInformation(
     "Correo: {Modo}",
     correoOptions.Configurado ? $"SMTP real vía {correoOptions.Host} ({correoOptions.Usuario})" : "simulado (solo log)");
+app.Logger.LogInformation(
+    "Imágenes R2: {Modo}",
+    r2Options.Configurado ? $"activo (bucket {r2Options.Bucket})" : "no configurado");
 
 // Migración + seed al arrancar.
 using (var scope = app.Services.CreateScope())
