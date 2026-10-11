@@ -1,0 +1,57 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{582C6A36-6CFC-4A7D-BE85-02A9AAEFFA90}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domna.Domain", "src\Domna.Domain\Domna.Domain.csproj", "{EB9E85EE-28DE-4543-BF70-0D8BBFDDC6F5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domna.Application", "src\Domna.Application\Domna.Application.csproj", "{7EC7B9BB-A709-4D7F-AA64-1D9779922603}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domna.Infrastructure", "src\Domna.Infrastructure\Domna.Infrastructure.csproj", "{A10C037C-C6C2-42EE-932B-9B0067B23B36}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domna.Api", "src\Domna.Api\Domna.Api.csproj", "{2E1B9A69-85D3-49B0-A8A3-9315D57FB208}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{DE604A95-C527-421A-9997-4E8F8ACAEDCD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domna.Tests", "tests\Domna.Tests\Domna.Tests.csproj", "{510301B3-2999-4124-9C03-E5315C7ECF37}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{EB9E85EE-28DE-4543-BF70-0D8BBFDDC6F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EB9E85EE-28DE-4543-BF70-0D8BBFDDC6F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EB9E85EE-28DE-4543-BF70-0D8BBFDDC6F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EB9E85EE-28DE-4543-BF70-0D8BBFDDC6F5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7EC7B9BB-A709-4D7F-AA64-1D9779922603}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7EC7B9BB-A709-4D7F-AA64-1D9779922603}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7EC7B9BB-A709-4D7F-AA64-1D9779922603}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7EC7B9BB-A709-4D7F-AA64-1D9779922603}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A10C037C-C6C2-42EE-932B-9B0067B23B36}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A10C037C-C6C2-42EE-932B-9B0067B23B36}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A10C037C-C6C2-42EE-932B-9B0067B23B36}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A10C037C-C6C2-42EE-932B-9B0067B23B36}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2E1B9A69-85D3-49B0-A8A3-9315D57FB208}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E1B9A69-85D3-49B0-A8A3-9315D57FB208}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E1B9A69-85D3-49B0-A8A3-9315D57FB208}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E1B9A69-85D3-49B0-A8A3-9315D57FB208}.Release|Any CPU.Build.0 = Release|Any CPU
+		{510301B3-2999-4124-9C03-E5315C7ECF37}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{510301B3-2999-4124-9C03-E5315C7ECF37}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{510301B3-2999-4124-9C03-E5315C7ECF37}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{510301B3-2999-4124-9C03-E5315C7ECF37}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{EB9E85EE-28DE-4543-BF70-0D8BBFDDC6F5} = {582C6A36-6CFC-4A7D-BE85-02A9AAEFFA90}
+		{7EC7B9BB-A709-4D7F-AA64-1D9779922603} = {582C6A36-6CFC-4A7D-BE85-02A9AAEFFA90}
+		{A10C037C-C6C2-42EE-932B-9B0067B23B36} = {582C6A36-6CFC-4A7D-BE85-02A9AAEFFA90}
+		{2E1B9A69-85D3-49B0-A8A3-9315D57FB208} = {582C6A36-6CFC-4A7D-BE85-02A9AAEFFA90}
+		{510301B3-2999-4124-9C03-E5315C7ECF37} = {DE604A95-C527-421A-9997-4E8F8ACAEDCD}
+	EndGlobalSection
+EndGlobal
