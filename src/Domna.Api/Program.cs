@@ -106,9 +106,26 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<DomnaDbContext>();
     var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-    // En Postgres aplicamos las migraciones (crea/actualiza las tablas). InMemory no las necesita.
-    if (DependencyInjection.UsaPostgres(connectionString))
-        db.Database.Migrate();
+    var usaPg = DependencyInjection.UsaPostgres(connectionString);
+    app.Logger.LogInformation(
+        "Base de datos: {Modo} (DATABASE_URL {Estado})",
+        usaPg ? "PostgreSQL" : "InMemory",
+        string.IsNullOrWhiteSpace(connectionString) ? "AUSENTE" : "presente");
+
+    if (usaPg)
+    {
+        try
+        {
+            db.Database.Migrate(); // crea/actualiza las tablas en Postgres
+            app.Logger.LogInformation("Migraciones aplicadas correctamente en PostgreSQL.");
+        }
+        catch (Exception ex)
+        {
+            // Si falla, lo gritamos en los logs (antes caía silencioso a datos efímeros).
+            app.Logger.LogError(ex, "FALLÓ la conexión/migración a PostgreSQL. Revisa DATABASE_URL.");
+            throw; // mejor que el deploy falle visible a que corra con datos que se pierden
+        }
+    }
     Seed.Sembrar(db, hasher);
 }
 
