@@ -1,0 +1,414 @@
+using Domna.Application.Abstractions;
+using Domna.Application.Dtos;
+using Domna.Application.Mapping;
+using Domna.Domain;
+
+namespace Domna.Application.Services;
+
+/// <summary>
+/// Apartados y ventas de contado (modalidad "compra" = venta directa, canal físico es el POS).
+/// Antes de cualquier lectura/escritura, procesa vencimientos (igual que el mock: "procesarVencimientos"
+/// se evalúa en cada acceso, no por un job aparte). El stock reservado se calcula on-the-fly
+/// consultando los apartados ACTIVOS (no se persiste un contador de reservas).
+/// </summary>
+public class ApartadoService : IApartadoService
+{
+    private const string PublicoGeneralId = "c-publico";
+
+    private readonly IApartadoRepository _apartados;
+    private readonly IProductoRepository _productos;
+    private readonly IClientaRepository _clientas;
+    private readonly IConfigRepository _config;
+    private readonly IReloj _reloj;
+
+    public ApartadoService(
+        IApartadoRepository apartados,
+        IProductoRepository productos,
+        IClientaRepository clientas,
+        IConfigRepository config,
+        IReloj reloj)
+    {
+        _apartados = apartados;
+        _productos = productos;
+        _clientas = clientas;
+        _config = config;
+        _reloj = reloj;
+    }
+
+    // ── Lectura ──
+
+    public async Task<List<ApartadoDto>> ListarAsync(string? estado, string? texto, string? tipo, CancellationToken ct = default)
+    {
+        await ProcesarVencimientosAsync(ct);
+        var lista = await _apartados.ListarAsync(ct);
+        var t = (texto ?? "").Trim().ToLowerInvariant();
+        var especiales = new[] { "por_vencer", "por_entregar", "entregado" };
+
+        var filtrada = lista.Where(a =>
+        {
+            if (tipo == "compras" && a.Modalidad != ModalidadApartado.Compra) return false;
+            if (tipo == "apartados" && a.Modalidad == ModalidadApartado.Compra) return false;
+            if (estado == "por_vencer" && !PorVencer(a)) return false;
+            if (estado == "por_entregar" && !PorEntregar(a)) return false;
+            if (estado == "entregado" && !(a.Estado == EstadoApartado.Liquidado && a.EstadoEntrega == EstadoEntrega.Entregado)) return false;
+            if (!string.IsNullOrEmpty(estado) && !especiales.Contains(estado) &&
+                EnumMap.EstadoApartado(a.Estado) != estado) return false;
+            if (t.Length > 0)
+            {
+                var hay = $"{a.Folio} {a.ClientaNombre} {a.ClientaTelefono} {string.Join(" ", a.Lineas.Select(l => l.Nombre))}".ToLowerInvariant();
+                if (!hay.Contains(t)) return false;
+            }
+            return true;
+        });
+
+        filtrada = estado == "por_vencer"
+            ? filtrada.OrderBy(a => a.VenceEl)
+            : filtrada.OrderByDescending(a => a.Creado);
+
+        return filtrada.Select(a => a.ToDto()).ToList();
+    }
+
+    public async Task<ApartadoDto> ObtenerAsync(string id, CancellationToken ct = default)
+    {
+        await ProcesarVencimientosAsync(ct);
+        var a = await _apartados.ObtenerPorIdAsync(id, ct)
+            ?? throw DomnaException.NotFound("Apartado no encontrado.");
+        return a.ToDto();
+    }
+
+    public async Task<List<ApartadoDto>> ListarDeClientaAsync(string clientaId, CancellationToken ct = default)
+    {
+        await ProcesarVencimientosAsync(ct);
+        var lista = await _apartados.ListarDeClientaAsync(clientaId, ct);
+        return lista.Select(a => a.ToDto()).ToList();
+    }
+
+    private static bool PorVencer(Apartado a) =>
+        a.Estado == EstadoApartado.Activo && (a.VenceEl.Date - DateTime.UtcNow.Date).TotalDays <= 3;
+
+    private static bool PorEntregar(Apartado a) =>
+        a.Estado == EstadoApartado.Liquidado && a.EstadoEntrega != EstadoEntrega.Entregado;
+
+    // ── Cotizar ──
+
+    public async Task<CotizacionApartadoDto> CotizarAsync(string? clientaId, CrearApartadoInput input, CancellationToken ct = default)
+    {
+        var hoy = _reloj.Ahora;
+        var penalizacionPendiente = 0m;
+        if (!string.IsNullOrEmpty(clientaId))
+        {
+            var clienta = await _clientas.ObtenerPorIdAsync(clientaId, ct);
+            penalizacionPendiente = clienta?.PenalizacionPendiente ?? 0;
+        }
+
+        List<LineaResuelta> lineas;
+        try
+        {
+            lineas = await ResolverLineasAsync(input, ct);
+        }
+        catch (DomnaException e) when (e.StatusCode == 409)
+        {
+            // La cotización no revienta por falta de stock: lo informa con sucursalOrigen = null.
+            return new CotizacionApartadoDto(0, penalizacionPendiente, penalizacionPendiente, 0, hoy, false, hoy, null);
+        }
+
+        var config = await _config.ObtenerAsync(ct);
+        var entrega = EnumMap.Sucursal(input.Entrega);
+        var modalidad = EnumMap.Modalidad(input.Modalidad);
+
+        var subtotal = lineas.Sum(l => l.Precio * l.Cantidad);
+        var total = subtotal + penalizacionPendiente;
+        var compra = modalidad == ModalidadApartado.Compra;
+        var conAnticipo = modalidad == ModalidadApartado.Anticipo;
+        var vigenciaDias = compra ? 0 : conAnticipo ? config.VigenciaConAnticipoDias : config.VigenciaSinAnticipoDias;
+        var requiereTraslado = lineas.Any(l => l.SucursalOrigen != entrega);
+        var listoEstimado = requiereTraslado ? SumarDiasHabiles(hoy, config.DiasTraslado) : hoy;
+        var anticipo = compra ? total : conAnticipo ? AnticipoDe(total, config.AnticipoPct) : 0;
+
+        return new CotizacionApartadoDto(
+            subtotal, penalizacionPendiente, total, anticipo,
+            hoy.AddDays(vigenciaDias), requiereTraslado, listoEstimado,
+            EnumMap.Sucursal(lineas[0].SucursalOrigen));
+    }
+
+    private static decimal AnticipoDe(decimal total, int pct) => Math.Ceiling(total * pct / 100m);
+
+    private static DateTime SumarDiasHabiles(DateTime d, int n)
+    {
+        var r = d;
+        var restantes = n;
+        while (restantes > 0)
+        {
+            r = r.AddDays(1);
+            if (r.DayOfWeek != DayOfWeek.Sunday) restantes--;
+        }
+        return r;
+    }
+
+    // ── Crear (apartar o comprar) ──
+
+    public async Task<ApartadoDto> CrearAsync(string? clientaId, CrearApartadoInput input, CancellationToken ct = default)
+    {
+        var hoy = _reloj.Ahora;
+        var config = await _config.ObtenerAsync(ct);
+        if (config.Suspendida)
+            throw new DomnaException(423, "La tienda está en pausa por el momento.");
+
+        var destino = string.IsNullOrEmpty(clientaId) ? PublicoGeneralId : clientaId;
+        var clienta = destino == PublicoGeneralId
+            ? null
+            : await _clientas.ObtenerPorIdAsync(destino, ct) ?? throw DomnaException.NotFound("Clienta no encontrada.");
+
+        var modalidad = EnumMap.Modalidad(input.Modalidad);
+        var compra = modalidad == ModalidadApartado.Compra;
+        var lineas = await ResolverLineasAsync(input, ct);
+
+        // Para apartados (no compra), todas las prendas deben permitir apartado.
+        if (!compra)
+        {
+            var productosUsados = await ObtenerProductosDeLineasAsync(lineas, ct);
+            var noApartable = lineas.FirstOrDefault(l => !productosUsados[l.ProductoId].PermiteApartado);
+            if (noApartable is not null)
+                throw DomnaException.BadRequest($"{noApartable.Nombre} solo se vende de contado.");
+
+            // Límite de apartados activos (no aplica a compras: no reservan).
+            if (!string.IsNullOrEmpty(clientaId))
+            {
+                var activos = await _apartados.ContarActivosDeClientaAsync(clientaId, ct);
+                if (activos >= config.LimiteApartadosActivos)
+                    throw DomnaException.BadRequest(
+                        $"Ya tienes {activos} apartados activos. Liquida uno para apartar otra prenda.");
+            }
+        }
+
+        var cot = CotizarInterno(clienta, lineas, config, input, hoy);
+        if (cot.SucursalOrigen is null)
+            throw DomnaException.Conflict("Ya no hay stock de una de las prendas. Revisa el carrito.");
+
+        var folio = await SiguienteFolioAsync(ct);
+        var entrega = EnumMap.Sucursal(input.Entrega);
+        var canal = EnumMap.Canal(input.Canal);
+        var metodoAnticipo = EnumMap.Metodo(input.MetodoAnticipo);
+        var clientaNombre = clienta is null ? "Público general" : $"{clienta.Nombre} {clienta.Apellidos}".Trim();
+        var clientaTelefono = clienta?.Telefono ?? "";
+
+        var drafts = lineas.Select(l => new LineaDraft(
+            l.VarianteId, l.ProductoId, l.Nombre, l.Silueta, l.Talla, l.ColorNombre, l.ColorHex,
+            l.Precio, l.Costo, l.Cantidad, l.SucursalOrigen)).ToList();
+
+        var apartado = Apartado.Crear(
+            NuevoId("ap"), folio, destino, clientaNombre, clientaTelefono,
+            drafts, cot.Subtotal, cot.Penalizacion, cot.Total, modalidad, canal, entrega,
+            cot.RequiereTraslado, hoy, cot.VenceEl, cot.ListoEstimado, cot.Anticipo, metodoAnticipo,
+            () => NuevoId("li"), () => NuevoId("ab"));
+
+        // Si quedó liquidado de inmediato (compra), descuenta stock físico real.
+        if (apartado.Estado == EstadoApartado.Liquidado)
+            await DescontarStockFisicoAsync(apartado, ct);
+
+        await _apartados.AgregarAsync(apartado, ct);
+
+        // La penalización pendiente se cobra en esta compra o apartado.
+        if (clienta is not null && clienta.PenalizacionPendiente > 0)
+            clienta.AjustarPenalizacion(-clienta.PenalizacionPendiente);
+
+        await _apartados.GuardarAsync(ct);
+        await _productos.GuardarAsync(ct);
+        if (clienta is not null) await _clientas.GuardarAsync(ct);
+
+        return apartado.ToDto();
+    }
+
+    // ── Abonar ──
+
+    public async Task<ApartadoDto> AbonarAsync(RegistrarAbonoInput input, CancellationToken ct = default)
+    {
+        await ProcesarVencimientosAsync(ct);
+        var a = await _apartados.ObtenerPorIdAsync(input.ApartadoId, ct)
+            ?? throw DomnaException.NotFound("Apartado no encontrado.");
+        var config = await _config.ObtenerAsync(ct);
+
+        a.Abonar(() => NuevoId("ab"), input.Monto, _reloj.Ahora, EnumMap.Metodo(input.Metodo), config.VigenciaConAnticipoDias);
+
+        if (a.Estado == EstadoApartado.Liquidado)
+        {
+            await DescontarStockFisicoAsync(a, ct);
+            await _productos.GuardarAsync(ct);
+        }
+
+        await _apartados.GuardarAsync(ct);
+        return a.ToDto();
+    }
+
+    // ── Cancelar / avanzar entrega ──
+
+    public async Task<ApartadoDto> CancelarAsync(string id, CancellationToken ct = default)
+    {
+        var a = await _apartados.ObtenerPorIdAsync(id, ct)
+            ?? throw DomnaException.NotFound("Apartado no encontrado.");
+        a.Cancelar(_reloj.Ahora);
+        await _apartados.GuardarAsync(ct);
+        return a.ToDto();
+    }
+
+    public async Task<ApartadoDto> AvanzarEntregaAsync(string id, string siguiente, CancellationToken ct = default)
+    {
+        var a = await _apartados.ObtenerPorIdAsync(id, ct)
+            ?? throw DomnaException.NotFound("Apartado no encontrado.");
+        a.AvanzarEntrega(EnumMap.EstadoEntrega(siguiente));
+        await _apartados.GuardarAsync(ct);
+        return a.ToDto();
+    }
+
+    // ── Vencimientos (se evalúan en cada lectura, igual que el mock) ──
+
+    private async Task ProcesarVencimientosAsync(CancellationToken ct)
+    {
+        var hoy = _reloj.Ahora;
+        var vencidos = await _apartados.ListarActivosVencidosAsync(hoy, ct);
+        if (vencidos.Count == 0) return;
+
+        var config = await _config.ObtenerAsync(ct);
+        var cambio = false;
+        foreach (var a in vencidos)
+        {
+            if (!a.Vencer(hoy)) continue;
+            cambio = true;
+            if (a.ClientaId == PublicoGeneralId) continue;
+            var clienta = await _clientas.ObtenerPorIdAsync(a.ClientaId, ct);
+            clienta?.AjustarPenalizacion(config.Penalizacion);
+        }
+        if (cambio)
+        {
+            await _apartados.GuardarAsync(ct);
+            await _clientas.GuardarAsync(ct);
+        }
+    }
+
+    // ── Resolución de líneas del carrito (multi-producto) ──
+
+    private record LineaResuelta(
+        string VarianteId, string ProductoId, string Nombre, Silueta Silueta, string Talla,
+        string ColorNombre, string ColorHex, decimal Precio, decimal Costo, int Cantidad, SucursalId SucursalOrigen);
+
+    /// <summary>Resuelve cada línea: valida stock disponible real y congela precio/costo/sucursal.</summary>
+    private async Task<List<LineaResuelta>> ResolverLineasAsync(CrearApartadoInput input, CancellationToken ct)
+    {
+        if (input.Lineas is null || input.Lineas.Count == 0)
+            throw DomnaException.BadRequest("Agrega al menos una prenda.");
+        foreach (var l in input.Lineas)
+            if (l.Cantidad < 1) throw DomnaException.BadRequest("Cantidad inválida.");
+
+        var entrega = EnumMap.Sucursal(input.Entrega);
+        var otra = entrega == SucursalId.Temixco ? SucursalId.Azteca : SucursalId.Temixco;
+
+        // Suma de cantidades por variante en el MISMO carrito, para validar stock total pedido.
+        var pedidoPorVariante = input.Lineas
+            .GroupBy(l => l.VarianteId)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Cantidad));
+
+        var varianteIds = pedidoPorVariante.Keys.ToList();
+        var reservadoPorVariante = await _apartados.ObtenerReservadoPorVariantesAsync(varianteIds, ct);
+
+        var resueltas = new List<LineaResuelta>();
+        foreach (var l in input.Lineas)
+        {
+            var enc = await BuscarProductoYVarianteAsync(l.VarianteId, ct);
+            if (enc is null || !enc.Value.Producto.Activo)
+                throw DomnaException.NotFound("Una de las prendas ya no está disponible.");
+            var (producto, variante) = enc.Value;
+
+            var reservado = reservadoPorVariante.GetValueOrDefault(variante.Id, new Dictionary<string, int>());
+            var dispTemixco = Math.Max(0, variante.StockDe(SucursalId.Temixco) - reservado.GetValueOrDefault("temixco"));
+            var dispAzteca = Math.Max(0, variante.StockDe(SucursalId.Azteca) - reservado.GetValueOrDefault("azteca"));
+
+            var pedidoTotal = pedidoPorVariante[l.VarianteId];
+            SucursalId? origen = null;
+            var dispEntrega = entrega == SucursalId.Temixco ? dispTemixco : dispAzteca;
+            var dispOtra = otra == SucursalId.Temixco ? dispTemixco : dispAzteca;
+            if (dispEntrega >= pedidoTotal) origen = entrega;
+            else if (dispOtra >= pedidoTotal) origen = otra;
+            if (origen is null)
+                throw DomnaException.Conflict($"Ya no hay stock suficiente de {producto.Nombre} ({variante.Talla}).");
+
+            var color = producto.Colores.First(c => c.Id == variante.ColorId);
+            resueltas.Add(new LineaResuelta(
+                variante.Id, producto.Id, producto.Nombre, producto.Silueta, variante.Talla,
+                color.Nombre, color.Hex, producto.Precio, producto.Costo, l.Cantidad, origen.Value));
+        }
+        return resueltas;
+    }
+
+    private async Task<(Producto Producto, Variante Variante)?> BuscarProductoYVarianteAsync(string varianteId, CancellationToken ct)
+    {
+        // No hay índice directo variante->producto en el repo; se resuelve por búsqueda de código no
+        // aplica aquí. En su lugar, listamos (el catálogo de una boutique es pequeño) y buscamos.
+        var todos = await _productos.ListarAsync(incluirInactivos: true, ct);
+        foreach (var p in todos)
+        {
+            var v = p.Variantes.FirstOrDefault(x => x.Id == varianteId);
+            if (v is not null) return (p, v);
+        }
+        return null;
+    }
+
+    private async Task<Dictionary<string, Producto>> ObtenerProductosDeLineasAsync(List<LineaResuelta> lineas, CancellationToken ct)
+    {
+        var resultado = new Dictionary<string, Producto>();
+        foreach (var productoId in lineas.Select(l => l.ProductoId).Distinct())
+        {
+            var p = await _productos.ObtenerPorIdAsync(productoId, ct);
+            if (p is not null) resultado[productoId] = p;
+        }
+        return resultado;
+    }
+
+    private static CotizacionInterna CotizarInterno(
+        Clienta? clienta, List<LineaResuelta> lineas, ConfigBoutique config, CrearApartadoInput input, DateTime hoy)
+    {
+        var entrega = EnumMap.Sucursal(input.Entrega);
+        var modalidad = EnumMap.Modalidad(input.Modalidad);
+        var penalizacionPendiente = clienta?.PenalizacionPendiente ?? 0;
+        var subtotal = lineas.Sum(l => l.Precio * l.Cantidad);
+        var total = subtotal + penalizacionPendiente;
+        var compra = modalidad == ModalidadApartado.Compra;
+        var conAnticipo = modalidad == ModalidadApartado.Anticipo;
+        var vigenciaDias = compra ? 0 : conAnticipo ? config.VigenciaConAnticipoDias : config.VigenciaSinAnticipoDias;
+        var requiereTraslado = lineas.Any(l => l.SucursalOrigen != entrega);
+        var listoEstimado = requiereTraslado ? SumarDiasHabiles(hoy, config.DiasTraslado) : hoy;
+        var anticipo = compra ? total : conAnticipo ? AnticipoDe(total, config.AnticipoPct) : 0;
+
+        return new CotizacionInterna(subtotal, penalizacionPendiente, total, anticipo,
+            hoy.AddDays(vigenciaDias), requiereTraslado, listoEstimado, lineas[0].SucursalOrigen);
+    }
+
+    private record CotizacionInterna(
+        decimal Subtotal, decimal Penalizacion, decimal Total, decimal Anticipo,
+        DateTime VenceEl, bool RequiereTraslado, DateTime ListoEstimado, SucursalId? SucursalOrigen);
+
+    /// <summary>Descuenta el stock físico real de cada línea (al liquidar: la reserva se vuelve venta).</summary>
+    private async Task DescontarStockFisicoAsync(Apartado a, CancellationToken ct)
+    {
+        var hoy = _reloj.Ahora;
+        foreach (var grupo in a.Lineas.GroupBy(l => l.ProductoId))
+        {
+            var producto = await _productos.ObtenerPorIdAsync(grupo.Key, ct);
+            if (producto is null) continue;
+            foreach (var l in grupo)
+            {
+                var variante = producto.Variantes.FirstOrDefault(v => v.Id == l.VarianteId);
+                if (variante is null) continue;
+                var nuevo = variante.StockDe(l.SucursalOrigen) - l.Cantidad;
+                producto.AjustarStock(variante.Id, l.SucursalOrigen, Math.Max(0, nuevo), hoy);
+            }
+        }
+    }
+
+    private async Task<string> SiguienteFolioAsync(CancellationToken ct)
+    {
+        var todos = await _apartados.ListarAsync(ct);
+        return $"DOM-{(todos.Count + 1):D4}";
+    }
+
+    private static string NuevoId(string prefijo) => $"{prefijo}-{Guid.NewGuid():N}"[..14];
+}

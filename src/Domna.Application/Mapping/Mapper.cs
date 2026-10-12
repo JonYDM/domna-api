@@ -69,4 +69,48 @@ public static class Mapper
         c.Nombre,
         c.Hex,
         EnumMap.Familia(c.Familia));
+
+    public static LineaApartadoDto ToDto(this LineaApartado l) => new(
+        l.VarianteId,
+        l.ProductoId,
+        l.Nombre,
+        EnumMap.Silueta(l.Silueta),
+        l.Talla,
+        l.ColorNombre,
+        l.ColorHex,
+        l.Precio,
+        l.Costo,
+        l.Cantidad,
+        EnumMap.Sucursal(l.SucursalOrigen));
+
+    public static AbonoDto ToDto(this Abono a) => new(
+        a.Id,
+        a.Monto,
+        a.Fecha,
+        EnumMap.Metodo(a.Metodo),
+        EnumMap.Concepto(a.Concepto));
+
+    public static ApartadoDto ToDto(this Apartado a) => new(
+        a.Id,
+        a.Folio,
+        a.ClientaId,
+        a.ClientaNombre,
+        a.ClientaTelefono,
+        a.Lineas.Select(l => l.ToDto()).ToList(),
+        a.Subtotal,
+        a.Penalizacion,
+        a.Total,
+        EnumMap.Modalidad(a.Modalidad),
+        EnumMap.Canal(a.Canal),
+        EnumMap.Sucursal(a.Entrega),
+        a.RequiereTraslado,
+        EnumMap.EstadoEntrega(a.EstadoEntrega),
+        a.Abonos.Select(ab => ab.ToDto()).ToList(),
+        a.Pagado,
+        a.Saldo,
+        a.Creado,
+        a.VenceEl,
+        a.ListoEstimado,
+        EnumMap.EstadoApartado(a.Estado),
+        a.CerradoEl);
 }

@@ -23,6 +23,116 @@ namespace Domna.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Domna.Domain.Abono", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ApartadoId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Concepto")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Metodo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Monto")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApartadoId");
+
+                    b.ToTable("Abonos");
+                });
+
+            modelBuilder.Entity("Domna.Domain.Apartado", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Canal")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("CerradoEl")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ClientaId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ClientaNombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ClientaTelefono")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Creado")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Entrega")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("EstadoEntrega")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Folio")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ListoEstimado")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Modalidad")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Penalizacion")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<bool>("Penalizado")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequiereTraslado")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTime>("VenceEl")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Folio")
+                        .IsUnique();
+
+                    b.ToTable("Apartados");
+                });
+
             modelBuilder.Entity("Domna.Domain.Categoria", b =>
                 {
                     b.Property<string>("Id")
@@ -150,6 +260,52 @@ namespace Domna.Infrastructure.Persistence.Migrations
                     b.ToTable("Colores");
                 });
 
+            modelBuilder.Entity("Domna.Domain.ConfigBoutique", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<int>("AnticipoPct")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("CatalogoPublico")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("DiasNovedad")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DiasTraslado")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LimiteApartadosActivos")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Penalizacion")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Suspendida")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("VigenciaConAnticipoDias")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VigenciaSinAnticipoDias")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Config");
+                });
+
             modelBuilder.Entity("Domna.Domain.ImagenProducto", b =>
                 {
                     b.Property<int>("Id")
@@ -177,6 +333,65 @@ namespace Domna.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProductoId");
 
                     b.ToTable("Imagenes");
+                });
+
+            modelBuilder.Entity("Domna.Domain.LineaApartado", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ApartadoId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Cantidad")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ColorHex")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ColorNombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Costo")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Precio")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("ProductoId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Silueta")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SucursalOrigen")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Talla")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("VarianteId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApartadoId");
+
+                    b.ToTable("LineasApartado");
                 });
 
             modelBuilder.Entity("Domna.Domain.Producto", b =>
@@ -291,6 +506,15 @@ namespace Domna.Infrastructure.Persistence.Migrations
                     b.ToTable("Variantes");
                 });
 
+            modelBuilder.Entity("Domna.Domain.Abono", b =>
+                {
+                    b.HasOne("Domna.Domain.Apartado", null)
+                        .WithMany("Abonos")
+                        .HasForeignKey("ApartadoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domna.Domain.ColorProducto", b =>
                 {
                     b.HasOne("Domna.Domain.Producto", null)
@@ -309,6 +533,15 @@ namespace Domna.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Domna.Domain.LineaApartado", b =>
+                {
+                    b.HasOne("Domna.Domain.Apartado", null)
+                        .WithMany("Lineas")
+                        .HasForeignKey("ApartadoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domna.Domain.Variante", b =>
                 {
                     b.HasOne("Domna.Domain.Producto", null)
@@ -316,6 +549,13 @@ namespace Domna.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ProductoId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Domna.Domain.Apartado", b =>
+                {
+                    b.Navigation("Abonos");
+
+                    b.Navigation("Lineas");
                 });
 
             modelBuilder.Entity("Domna.Domain.Producto", b =>

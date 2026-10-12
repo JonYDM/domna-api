@@ -49,6 +49,8 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IPersonalService, PersonalService>();
         services.AddScoped<IClientasPanelService, ClientasPanelService>();
+        services.AddScoped<IApartadoService, ApartadoService>();
+        services.AddScoped<IConfigService, ConfigService>();
         services.AddScoped<IProductoService, ProductoService>();
         services.AddScoped<ICategoriaService, CategoriaService>();
         services.AddScoped<IColorService, ColorService>();

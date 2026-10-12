@@ -55,4 +55,61 @@ public static class EnumMap
     public static string Origen(OrigenClienta valor) => valor.ToString().ToLowerInvariant();
 
     public static string Rol(Rol valor) => valor.ToString().ToLowerInvariant();
+
+    public static ModalidadApartado Modalidad(string valor) => valor?.Trim().ToLowerInvariant() switch
+    {
+        "sin_anticipo" => ModalidadApartado.SinAnticipo,
+        "anticipo" => ModalidadApartado.Anticipo,
+        "compra" => ModalidadApartado.Compra,
+        _ => throw DomnaException.BadRequest($"Modalidad inválida: '{valor}'.")
+    };
+
+    public static string Modalidad(ModalidadApartado valor) => valor switch
+    {
+        ModalidadApartado.SinAnticipo => "sin_anticipo",
+        ModalidadApartado.Anticipo => "anticipo",
+        ModalidadApartado.Compra => "compra",
+        _ => throw new ArgumentOutOfRangeException(nameof(valor))
+    };
+
+    public static Canal Canal(string? valor) => valor?.Trim().ToLowerInvariant() switch
+    {
+        "fisico" => Domain.Canal.Fisico,
+        _ => Domain.Canal.Online
+    };
+
+    public static string Canal(Canal valor) => valor == Domain.Canal.Fisico ? "fisico" : "online";
+
+    public static string EstadoApartado(EstadoApartado valor) => valor.ToString().ToLowerInvariant();
+
+    public static EstadoEntrega EstadoEntrega(string valor) => valor?.Trim().ToLowerInvariant() switch
+    {
+        "en_origen" => Domain.EstadoEntrega.EnOrigen,
+        "en_traslado" => Domain.EstadoEntrega.EnTraslado,
+        "listo" => Domain.EstadoEntrega.Listo,
+        "entregado" => Domain.EstadoEntrega.Entregado,
+        _ => throw DomnaException.BadRequest($"Estado de entrega inválido: '{valor}'.")
+    };
+
+    public static string EstadoEntrega(EstadoEntrega valor) => valor switch
+    {
+        Domain.EstadoEntrega.EnOrigen => "en_origen",
+        Domain.EstadoEntrega.EnTraslado => "en_traslado",
+        Domain.EstadoEntrega.Listo => "listo",
+        Domain.EstadoEntrega.Entregado => "entregado",
+        _ => throw new ArgumentOutOfRangeException(nameof(valor))
+    };
+
+    public static MetodoPago Metodo(string? valor) => valor?.Trim().ToLowerInvariant() switch
+    {
+        "efectivo" => MetodoPago.Efectivo,
+        "tarjeta" => MetodoPago.Tarjeta,
+        "transferencia" => MetodoPago.Transferencia,
+        null => MetodoPago.Transferencia,
+        _ => throw DomnaException.BadRequest($"Método de pago inválido: '{valor}'.")
+    };
+
+    public static string Metodo(MetodoPago valor) => valor.ToString().ToLowerInvariant();
+
+    public static string Concepto(ConceptoAbono valor) => valor.ToString().ToLowerInvariant();
 }

@@ -99,6 +99,14 @@ public class Clienta
     public void RegistrarAcceso(DateTime ahora) => UltimoAcceso = ahora;
 
     /// <summary>
+    /// Suma (o resta, con delta negativo) a la penalización pendiente de la clienta. Se usa al
+    /// vencer un apartado (suma el cargo) y al cobrar en el siguiente apartado/compra (la limpia).
+    /// Nunca queda negativa.
+    /// </summary>
+    public void AjustarPenalizacion(decimal delta) =>
+        PenalizacionPendiente = Math.Max(0, PenalizacionPendiente + delta);
+
+    /// <summary>
     /// Edita los datos de una cuenta de staff (nombre, teléfono y, si es cajera, su sucursal).
     /// Lo usa la dueña desde el panel de Personal.
     /// </summary>

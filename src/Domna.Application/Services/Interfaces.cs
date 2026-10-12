@@ -44,6 +44,27 @@ public interface IClientasPanelService
     Task<ClientaDto> CrearAsync(CrearClientaInput input, CancellationToken ct = default);
 }
 
+/// <summary>Casos de uso de apartados/ventas: cotizar, crear, abonar, cancelar, avanzar entrega.</summary>
+public interface IApartadoService
+{
+    Task<CotizacionApartadoDto> CotizarAsync(string? clientaId, CrearApartadoInput input, CancellationToken ct = default);
+    Task<ApartadoDto> CrearAsync(string? clientaId, CrearApartadoInput input, CancellationToken ct = default);
+    Task<ApartadoDto> AbonarAsync(RegistrarAbonoInput input, CancellationToken ct = default);
+    Task<ApartadoDto> CancelarAsync(string id, CancellationToken ct = default);
+    Task<ApartadoDto> AvanzarEntregaAsync(string id, string siguiente, CancellationToken ct = default);
+    Task<List<ApartadoDto>> ListarAsync(string? estado, string? texto, string? tipo, CancellationToken ct = default);
+    Task<ApartadoDto> ObtenerAsync(string id, CancellationToken ct = default);
+    Task<List<ApartadoDto>> ListarDeClientaAsync(string clientaId, CancellationToken ct = default);
+}
+
+/// <summary>Configuración de negocio de la boutique.</summary>
+public interface IConfigService
+{
+    Task<ConfigBoutiqueDto> ObtenerAsync(CancellationToken ct = default);
+    Task<ConfigBoutiqueDto> FijarSuspendidaAsync(bool suspendida, CancellationToken ct = default);
+    Task<ConfigBoutiqueDto> FijarCatalogoPublicoAsync(bool publico, CancellationToken ct = default);
+}
+
 /// <summary>Casos de uso del CRUD de prenda.</summary>
 public interface IProductoService
 {
