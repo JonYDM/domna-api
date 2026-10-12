@@ -29,6 +29,8 @@ public static class DependencyInjection
         services.AddScoped<IProductoRepository, ProductoRepository>();
         services.AddScoped<ICategoriaRepository, CategoriaRepository>();
         services.AddScoped<IColorRepository, ColorRepository>();
+        services.AddScoped<IApartadoRepository, ApartadoRepository>();
+        services.AddScoped<IConfigRepository, ConfigRepository>();
 
         services.AddSingleton(jwtOptions);
         services.AddSingleton(correoOptions);

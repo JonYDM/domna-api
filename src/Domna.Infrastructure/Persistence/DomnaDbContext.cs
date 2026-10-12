@@ -20,6 +20,10 @@ public class DomnaDbContext : DbContext
     public DbSet<ImagenProducto> Imagenes => Set<ImagenProducto>();
     public DbSet<Categoria> Categorias => Set<Categoria>();
     public DbSet<ColorCatalogo> ColoresCatalogo => Set<ColorCatalogo>();
+    public DbSet<Apartado> Apartados => Set<Apartado>();
+    public DbSet<LineaApartado> LineasApartado => Set<LineaApartado>();
+    public DbSet<Abono> Abonos => Set<Abono>();
+    public DbSet<ConfigBoutique> Config => Set<ConfigBoutique>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -86,6 +90,47 @@ public class DomnaDbContext : DbContext
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.Familia).HasConversion<string>();
+        });
+
+        b.Entity<Apartado>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Folio).IsUnique();
+            e.Property(x => x.Subtotal).HasPrecision(12, 2);
+            e.Property(x => x.Penalizacion).HasPrecision(12, 2);
+            e.Property(x => x.Total).HasPrecision(12, 2);
+            e.Property(x => x.Modalidad).HasConversion<string>();
+            e.Property(x => x.Canal).HasConversion<string>();
+            e.Property(x => x.Entrega).HasConversion<string>();
+            e.Property(x => x.EstadoEntrega).HasConversion<string>();
+            e.Property(x => x.Estado).HasConversion<string>();
+            e.HasMany(x => x.Lineas).WithOne().HasForeignKey(l => l.ApartadoId);
+            e.HasMany(x => x.Abonos).WithOne().HasForeignKey(a => a.ApartadoId);
+            e.Navigation(x => x.Lineas).UsePropertyAccessMode(PropertyAccessMode.Field);
+            e.Navigation(x => x.Abonos).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        b.Entity<LineaApartado>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Silueta).HasConversion<string>();
+            e.Property(x => x.SucursalOrigen).HasConversion<string>();
+            e.Property(x => x.Precio).HasPrecision(12, 2);
+            e.Property(x => x.Costo).HasPrecision(12, 2);
+        });
+
+        b.Entity<Abono>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Monto).HasPrecision(12, 2);
+            e.Property(x => x.Metodo).HasConversion<string>();
+            e.Property(x => x.Concepto).HasConversion<string>();
+        });
+
+        b.Entity<ConfigBoutique>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Penalizacion).HasPrecision(12, 2);
         });
     }
 }

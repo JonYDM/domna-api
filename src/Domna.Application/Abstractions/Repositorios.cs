@@ -58,3 +58,37 @@ public interface IColorRepository
     Task EliminarAsync(ColorCatalogo color, CancellationToken ct = default);
     Task GuardarAsync(CancellationToken ct = default);
 }
+
+/// <summary>Persistencia de apartados/ventas y el cálculo de piezas reservadas (stock on-the-fly).</summary>
+public interface IApartadoRepository
+{
+    Task<Apartado?> ObtenerPorIdAsync(string id, CancellationToken ct = default);
+    Task<List<Apartado>> ListarAsync(CancellationToken ct = default);
+    Task<List<Apartado>> ListarDeClientaAsync(string clientaId, CancellationToken ct = default);
+
+    /// <summary>Apartados ACTIVOS de una clienta (para el límite de apartados simultáneos).</summary>
+    Task<int> ContarActivosDeClientaAsync(string clientaId, CancellationToken ct = default);
+
+    /// <summary>Apartados activos cuya vigencia ya pasó (para procesarlos al vencimiento).</summary>
+    Task<List<Apartado>> ListarActivosVencidosAsync(DateTime hoy, CancellationToken ct = default);
+
+    /// <summary>
+    /// Piezas reservadas de una variante en apartados ACTIVOS, por sucursal de origen.
+    /// disponible = stock físico − reservado (se calcula aquí, no se persiste).
+    /// </summary>
+    Task<Dictionary<string, int>> ObtenerReservadoAsync(string varianteId, CancellationToken ct = default);
+
+    /// <summary>Igual que arriba, pero para varias variantes a la vez (listados de catálogo).</summary>
+    Task<Dictionary<string, Dictionary<string, int>>> ObtenerReservadoPorVariantesAsync(
+        IEnumerable<string> varianteIds, CancellationToken ct = default);
+
+    Task AgregarAsync(Apartado apartado, CancellationToken ct = default);
+    Task GuardarAsync(CancellationToken ct = default);
+}
+
+/// <summary>Persistencia de la configuración de negocio (fila única).</summary>
+public interface IConfigRepository
+{
+    Task<ConfigBoutique> ObtenerAsync(CancellationToken ct = default);
+    Task GuardarAsync(CancellationToken ct = default);
+}
