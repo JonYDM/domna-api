@@ -66,4 +66,66 @@ public class PersonalServiceTests
 
         await Assert.ThrowsAsync<DomnaException>(() => personal.CrearCajeraAsync(new CrearCajeraInput("Lupita", "7779998877", "123", "temixco")));
     }
+
+    [Fact]
+    public async Task EditarCajera_actualiza_nombre_telefono_y_sucursal()
+    {
+        var repo = new ClientaRepoFake(Duena());
+        var personal = Crear(repo);
+        var cajera = await personal.CrearCajeraAsync(NuevaCajera());
+
+        var editada = await personal.EditarCajeraAsync(cajera.Id, new EditarCajeraInput("Lupita Flores", "7779998800", "azteca"));
+
+        Assert.Equal("Lupita Flores", editada.Nombre);
+        Assert.Equal("777 999 8800", editada.Telefono);
+        Assert.Equal("azteca", editada.SucursalCajera);
+    }
+
+    [Fact]
+    public async Task EditarCajera_rechaza_telefono_de_otra_cuenta()
+    {
+        var repo = new ClientaRepoFake(Duena());
+        var personal = Crear(repo);
+        var cajera = await personal.CrearCajeraAsync(NuevaCajera());
+
+        await Assert.ThrowsAsync<DomnaException>(
+            () => personal.EditarCajeraAsync(cajera.Id, new EditarCajeraInput("Lupita", "7774602303", "temixco")));
+    }
+
+    [Fact]
+    public async Task EditarCajera_rechaza_editar_a_la_duena()
+    {
+        var repo = new ClientaRepoFake(Duena());
+        var personal = Crear(repo);
+
+        await Assert.ThrowsAsync<DomnaException>(
+            () => personal.EditarCajeraAsync("u-jessica", new EditarCajeraInput("Jessica", "7779998877", "temixco")));
+    }
+
+    [Fact]
+    public async Task ResetPin_fija_un_pin_nuevo()
+    {
+        var repo = new ClientaRepoFake(Duena());
+        var personal = Crear(repo);
+        var cajera = await personal.CrearCajeraAsync(NuevaCajera());
+
+        await personal.ResetPinAsync(cajera.Id, new ResetPinInput("999999"));
+
+        var guardada = await repo.ObtenerPorIdAsync(cajera.Id);
+        Assert.True(_hasher.Verificar("999999", guardada!.PinHash!));
+    }
+
+    [Fact]
+    public async Task Desactivar_y_activar_cambian_el_acceso()
+    {
+        var repo = new ClientaRepoFake(Duena());
+        var personal = Crear(repo);
+        var cajera = await personal.CrearCajeraAsync(NuevaCajera());
+
+        var desactivada = await personal.DesactivarAsync(cajera.Id);
+        Assert.False(desactivada.Activo);
+
+        var reactivada = await personal.ActivarAsync(cajera.Id);
+        Assert.True(reactivada.Activo);
+    }
 }

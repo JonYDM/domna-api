@@ -17,7 +17,8 @@ public static class Mapper
         c.SucursalCajera is null ? null : EnumMap.Sucursal(c.SucursalCajera.Value),
         c.Creada,
         c.UltimoAcceso,
-        c.PenalizacionPendiente);
+        c.PenalizacionPendiente,
+        c.Activo);
 
     public static VarianteDto ToDto(this Variante v) => new(
         v.Id,

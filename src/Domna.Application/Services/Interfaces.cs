@@ -19,6 +19,18 @@ public interface IPersonalService
 {
     Task<List<ClientaDto>> ListarAsync(CancellationToken ct = default);
     Task<ClientaDto> CrearCajeraAsync(CrearCajeraInput input, CancellationToken ct = default);
+
+    /// <summary>Edita nombre, teléfono y sucursal de una cajera. Solo aplica a cajeras, no a la dueña.</summary>
+    Task<ClientaDto> EditarCajeraAsync(string id, EditarCajeraInput input, CancellationToken ct = default);
+
+    /// <summary>Fija un PIN nuevo para una cajera que lo olvidó.</summary>
+    Task<ClientaDto> ResetPinAsync(string id, ResetPinInput input, CancellationToken ct = default);
+
+    /// <summary>Bloquea el acceso de una cajera (conserva su historial).</summary>
+    Task<ClientaDto> DesactivarAsync(string id, CancellationToken ct = default);
+
+    /// <summary>Restaura el acceso de una cajera desactivada.</summary>
+    Task<ClientaDto> ActivarAsync(string id, CancellationToken ct = default);
 }
 
 /// <summary>Casos de uso del CRUD de prenda.</summary>

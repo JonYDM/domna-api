@@ -199,4 +199,17 @@ public class AuthServiceTests
         Assert.Equal("cajera", sesion.Clienta.Rol);
         Assert.Equal("temixco", sesion.Clienta.SucursalCajera);
     }
+
+    [Fact]
+    public async Task Login_de_cajera_desactivada_lanza_401_generico()
+    {
+        var caja = Clienta.CrearStaff("u2", "Caja", "", "7771004050",
+            "caja@correo.com", Rol.Cajera, _hasher.Hash("135790"), _reloj.Ahora, SucursalId.Temixco);
+        caja.Desactivar();
+        var auth = Crear(new ClientaRepoFake(caja));
+
+        var ex = await Assert.ThrowsAsync<DomnaException>(
+            () => auth.LoginAsync(new LoginInput("7771004050", "135790")));
+        Assert.Equal(401, ex.StatusCode);
+    }
 }

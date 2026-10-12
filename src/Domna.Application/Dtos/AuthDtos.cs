@@ -12,7 +12,8 @@ public record ClientaDto(
     string? SucursalCajera,
     DateTime Creada,
     DateTime? UltimoAcceso,
-    decimal PenalizacionPendiente);
+    decimal PenalizacionPendiente,
+    bool Activo);
 
 /// <summary>Alta propia de la clienta (sign-in): nombre, apellidos, teléfono +52, correo y PIN de 6 dígitos.</summary>
 public record RegistroClientaInput(

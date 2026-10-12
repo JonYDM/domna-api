@@ -46,6 +46,9 @@ namespace Domna.Infrastructure.Persistence.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("text");
 
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Apellidos")
                         .IsRequired()
                         .HasColumnType("text");

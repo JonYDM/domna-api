@@ -83,8 +83,8 @@ public class AuthService : IAuthService
         var pin = Normalizacion.NormalizarPin(input.Pin);
 
         var clienta = await _clientas.ObtenerPorTelefonoAsync(telefono, ct);
-        // Mensaje genérico: no filtrar qué dato falló.
-        if (clienta is null || !clienta.TieneAcceso || !_hasher.Verificar(pin, clienta.PinHash!))
+        // Mensaje genérico: no filtrar qué dato falló (ni si la cuenta está desactivada).
+        if (clienta is null || !clienta.TieneAcceso || !clienta.Activo || !_hasher.Verificar(pin, clienta.PinHash!))
             throw DomnaException.Unauthorized("Teléfono o PIN incorrecto.");
 
         clienta.RegistrarAcceso(_reloj.Ahora);

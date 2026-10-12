@@ -26,6 +26,12 @@ public class Clienta
     /// <summary>Hash BCrypt del PIN. Null cuando la clienta fue dada de alta en mostrador sin acceso.</summary>
     public string? PinHash { get; private set; }
 
+    /// <summary>
+    /// ¿La cuenta puede iniciar sesión? Para staff: la dueña desactiva el acceso de una cajera sin
+    /// borrar su historial de ventas. Las clientas siempre nacen activas.
+    /// </summary>
+    public bool Activo { get; private set; } = true;
+
     private Clienta() { }
 
     /// <summary>
@@ -91,6 +97,39 @@ public class Clienta
     public void FijarPinHash(string pinHash) => PinHash = pinHash;
 
     public void RegistrarAcceso(DateTime ahora) => UltimoAcceso = ahora;
+
+    /// <summary>
+    /// Edita los datos de una cuenta de staff (nombre, teléfono y, si es cajera, su sucursal).
+    /// Lo usa la dueña desde el panel de Personal.
+    /// </summary>
+    public void EditarStaff(string nombre, string telefono, SucursalId? sucursalCajera)
+    {
+        if (Rol == Rol.Clienta)
+            throw DomnaException.BadRequest("EditarStaff es solo para dueña o cajera.");
+        var nombreNorm = Normalizacion.NormalizarNombre(nombre);
+        if (nombreNorm.Length < 2)
+            throw DomnaException.BadRequest("Escribe el nombre.");
+        Nombre = nombreNorm;
+        Telefono = Normalizacion.NormalizarTelefono(telefono);
+        if (Rol == Rol.Cajera)
+            SucursalCajera = sucursalCajera;
+    }
+
+    /// <summary>Bloquea el acceso de una cuenta de staff (no puede iniciar sesión) sin borrar su historial.</summary>
+    public void Desactivar()
+    {
+        if (Rol == Rol.Clienta)
+            throw DomnaException.BadRequest("Desactivar es solo para dueña o cajera.");
+        Activo = false;
+    }
+
+    /// <summary>Restaura el acceso de una cuenta de staff previamente desactivada.</summary>
+    public void Activar()
+    {
+        if (Rol == Rol.Clienta)
+            throw DomnaException.BadRequest("Activar es solo para dueña o cajera.");
+        Activo = true;
+    }
 
     /// <summary>
     /// Reclama una ficha de mostrador sin acceso: conserva el id/historial y fija nombre,

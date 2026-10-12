@@ -26,4 +26,24 @@ public class PersonalController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ClientaDto>> CrearCajera(CrearCajeraInput input, CancellationToken ct)
         => Ok(await _personal.CrearCajeraAsync(input, ct));
+
+    /// <summary>Edita nombre, teléfono y sucursal de una cajera.</summary>
+    [HttpPut("{id}")]
+    public async Task<ActionResult<ClientaDto>> EditarCajera(string id, EditarCajeraInput input, CancellationToken ct)
+        => Ok(await _personal.EditarCajeraAsync(id, input, ct));
+
+    /// <summary>Fija un PIN nuevo para una cajera que lo olvidó.</summary>
+    [HttpPost("{id}/pin")]
+    public async Task<ActionResult<ClientaDto>> ResetPin(string id, ResetPinInput input, CancellationToken ct)
+        => Ok(await _personal.ResetPinAsync(id, input, ct));
+
+    /// <summary>Bloquea el acceso de una cajera (conserva su historial).</summary>
+    [HttpPost("{id}/desactivar")]
+    public async Task<ActionResult<ClientaDto>> Desactivar(string id, CancellationToken ct)
+        => Ok(await _personal.DesactivarAsync(id, ct));
+
+    /// <summary>Restaura el acceso de una cajera desactivada.</summary>
+    [HttpPost("{id}/activar")]
+    public async Task<ActionResult<ClientaDto>> Activar(string id, CancellationToken ct)
+        => Ok(await _personal.ActivarAsync(id, ct));
 }

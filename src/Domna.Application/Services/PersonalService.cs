@@ -56,5 +56,55 @@ public class PersonalService : IPersonalService
         return cajera.ToDto();
     }
 
+    public async Task<ClientaDto> EditarCajeraAsync(string id, EditarCajeraInput input, CancellationToken ct = default)
+    {
+        var cajera = await ObtenerCajeraAsync(id, ct);
+        var telefono = Normalizacion.NormalizarTelefono(input.Telefono);
+        var sucursal = EnumMap.Sucursal(input.Sucursal);
+
+        var existente = await _clientas.ObtenerPorTelefonoAsync(telefono, ct);
+        if (existente is not null && existente.Id != id)
+            throw DomnaException.Conflict("Ya hay una cuenta con ese teléfono.");
+
+        cajera.EditarStaff(input.Nombre, telefono, sucursal);
+        await _clientas.GuardarAsync(ct);
+        return cajera.ToDto();
+    }
+
+    public async Task<ClientaDto> ResetPinAsync(string id, ResetPinInput input, CancellationToken ct = default)
+    {
+        var cajera = await ObtenerCajeraAsync(id, ct);
+        var pin = Normalizacion.NormalizarPin(input.Pin);
+        cajera.FijarPinHash(_hasher.Hash(pin));
+        await _clientas.GuardarAsync(ct);
+        return cajera.ToDto();
+    }
+
+    public async Task<ClientaDto> DesactivarAsync(string id, CancellationToken ct = default)
+    {
+        var cajera = await ObtenerCajeraAsync(id, ct);
+        cajera.Desactivar();
+        await _clientas.GuardarAsync(ct);
+        return cajera.ToDto();
+    }
+
+    public async Task<ClientaDto> ActivarAsync(string id, CancellationToken ct = default)
+    {
+        var cajera = await ObtenerCajeraAsync(id, ct);
+        cajera.Activar();
+        await _clientas.GuardarAsync(ct);
+        return cajera.ToDto();
+    }
+
+    /// <summary>Busca una cajera por id. 404 si no existe; 400 si el id es de la dueña (no se edita aquí).</summary>
+    private async Task<Clienta> ObtenerCajeraAsync(string id, CancellationToken ct)
+    {
+        var clienta = await _clientas.ObtenerPorIdAsync(id, ct)
+            ?? throw DomnaException.NotFound("No encontramos a esa persona.");
+        if (clienta.Rol != Rol.Cajera)
+            throw DomnaException.BadRequest("Solo se puede editar a una cajera.");
+        return clienta;
+    }
+
     private static string NuevoId() => $"u-{Guid.NewGuid():N}"[..12];
 }
