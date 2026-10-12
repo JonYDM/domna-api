@@ -65,3 +65,29 @@ public record ApartadoDto(
 public record RegistrarAbonoInput(string ApartadoId, decimal Monto, string Metodo);
 
 public record AvanzarEntregaInput(string Siguiente);
+
+/// <summary>Corte del día de una sucursal: ventas liquidadas y cerradas ese día (hora de México).</summary>
+public record CorteDiaDto(string Sucursal, string Dia, decimal VentasDia, decimal GananciaDia, int PiezasDia, int Tickets);
+
+public record StockBajoItemDto(string ProductoId, string Nombre, string Talla, string ColorNombre, string ColorHex, int Disponible);
+
+public record TopProductoDto(string ProductoId, string Nombre, string Silueta, string ColorHex, int Unidades);
+
+public record VentaDiaDto(string Dia, decimal Total);
+
+/// <summary>Métricas del panel de la dueña (dashboard).</summary>
+public record MetricasDto(
+    int ApartadosActivos,
+    decimal MontoActivos,
+    decimal SaldoPorCobrar,
+    int PorVencer,
+    decimal VentasMes,
+    decimal GananciaMes,
+    int PiezasVendidasMes,
+    int Conversion,
+    int PorEntregar,
+    int ComprasMes,
+    decimal PenalizacionesMes,
+    List<StockBajoItemDto> StockBajo,
+    List<TopProductoDto> TopProductos,
+    List<VentaDiaDto> VentasUltimos7);

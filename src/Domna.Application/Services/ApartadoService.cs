@@ -83,6 +83,139 @@ public class ApartadoService : IApartadoService
         return lista.Select(a => a.ToDto()).ToList();
     }
 
+    private static readonly TimeZoneInfo ZonaMx = ObtenerZonaMx();
+
+    private static TimeZoneInfo ObtenerZonaMx()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("America/Mexico_City"); }
+        catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time (Mexico)"); }
+    }
+
+    private static string DiaMx(DateTime utc)
+    {
+        var local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), ZonaMx);
+        return local.ToString("yyyy-MM-dd");
+    }
+
+    public async Task<CorteDiaDto> CorteDiaAsync(string sucursal, CancellationToken ct = default)
+    {
+        await ProcesarVencimientosAsync(ct);
+        var suc = EnumMap.Sucursal(sucursal);
+        var hoy = DiaMx(_reloj.Ahora);
+        var lista = await _apartados.ListarAsync(ct);
+
+        var delDia = lista.Where(a => a.Estado == EstadoApartado.Liquidado && a.CerradoEl is not null && DiaMx(a.CerradoEl.Value) == hoy);
+
+        decimal ventas = 0, ganancia = 0;
+        int piezas = 0, tickets = 0;
+        foreach (var a in delDia)
+        {
+            var lineas = a.Lineas.Where(l => l.SucursalOrigen == suc).ToList();
+            if (lineas.Count == 0) continue;
+            ventas += lineas.Sum(l => l.Precio * l.Cantidad);
+            ganancia += lineas.Sum(l => l.Ganancia);
+            piezas += lineas.Sum(l => l.Cantidad);
+            tickets++;
+        }
+
+        return new CorteDiaDto(sucursal, hoy, ventas, ganancia, piezas, tickets);
+    }
+
+    public async Task<MetricasDto> MetricasAsync(string? sucursal, CancellationToken ct = default)
+    {
+        await ProcesarVencimientosAsync(ct);
+        var hoy = _reloj.Ahora;
+        var hoyMx = DiaMx(hoy);
+        var suc = string.IsNullOrEmpty(sucursal) || sucursal == "todas" ? (SucursalId?)null : EnumMap.Sucursal(sucursal);
+
+        var apartados = await _apartados.ListarAsync(ct);
+        var activos = apartados.Where(a => a.Estado == EstadoApartado.Activo).ToList();
+        var liquidados = apartados.Where(a => a.Estado == EstadoApartado.Liquidado).ToList();
+        var delMes = liquidados.Where(a => a.CerradoEl is not null && MismoMesMx(a.CerradoEl.Value, hoy)).ToList();
+        // Conversión de APARTADOS (las compras de contado no cuentan: siempre se concretan).
+        var cerrados = apartados.Where(a => a.Estado != EstadoApartado.Activo && a.Modalidad != ModalidadApartado.Compra).ToList();
+        var apartadosLiquidados = cerrados.Count(a => a.Estado == EstadoApartado.Liquidado);
+
+        List<LineaApartado> LineasDeSucursal(Apartado a) =>
+            suc is null ? a.Lineas.ToList() : a.Lineas.Where(l => l.SucursalOrigen == suc.Value).ToList();
+        decimal TotalDeSucursal(Apartado a) => LineasDeSucursal(a).Sum(l => l.Precio * l.Cantidad);
+
+        var config = await _config.ObtenerAsync(ct);
+
+        // Stock bajo: productos activos con alguna variante disponible <= STOCK_BAJO.
+        const int stockBajoUmbral = 2;
+        var productos = await _productos.ListarAsync(incluirInactivos: false, ct);
+        var varianteIds = productos.SelectMany(p => p.Variantes).Select(v => v.Id).ToList();
+        var reservadoPorVariante = await _apartados.ObtenerReservadoPorVariantesAsync(varianteIds, ct);
+        var stockBajo = new List<StockBajoItemDto>();
+        foreach (var p in productos)
+        {
+            foreach (var v in p.Variantes)
+            {
+                var reservado = reservadoPorVariante.GetValueOrDefault(v.Id, new Dictionary<string, int>());
+                var dispTemixco = Math.Max(0, v.StockDe(SucursalId.Temixco) - reservado.GetValueOrDefault("temixco"));
+                var dispAzteca = Math.Max(0, v.StockDe(SucursalId.Azteca) - reservado.GetValueOrDefault("azteca"));
+                var disponible = dispTemixco + dispAzteca;
+                if (disponible > stockBajoUmbral) continue;
+                var color = p.Colores.First(c => c.Id == v.ColorId);
+                stockBajo.Add(new StockBajoItemDto(p.Id, p.Nombre, v.Talla, color.Nombre, color.Hex, disponible));
+            }
+        }
+        stockBajo = stockBajo.OrderBy(x => x.Disponible).ToList();
+
+        // Top productos por unidades vendidas/apartadas.
+        var unidades = new Dictionary<string, TopProductoDto>();
+        foreach (var a in liquidados.Concat(activos))
+        {
+            foreach (var l in LineasDeSucursal(a))
+            {
+                if (unidades.TryGetValue(l.ProductoId, out var existente))
+                    unidades[l.ProductoId] = existente with { Unidades = existente.Unidades + l.Cantidad };
+                else
+                    unidades[l.ProductoId] = new TopProductoDto(l.ProductoId, l.Nombre, EnumMap.Silueta(l.Silueta), l.ColorHex, l.Cantidad);
+            }
+        }
+        var topProductos = unidades.Values.OrderByDescending(x => x.Unidades).Take(5).ToList();
+
+        // Ventas de los últimos 7 días (incluye hoy).
+        var ventasUltimos7 = Enumerable.Range(-6, 7)
+            .Select(offset =>
+            {
+                var dia = DiaMx(hoy.AddDays(offset));
+                var total = liquidados
+                    .Where(a => a.CerradoEl is not null && DiaMx(a.CerradoEl.Value) == dia)
+                    .Sum(TotalDeSucursal);
+                return new VentaDiaDto(dia, total);
+            })
+            .ToList();
+
+        var penalizacionesMes = apartados.Count(a =>
+            a.Estado == EstadoApartado.Vencido && a.CerradoEl is not null && MismoMesMx(a.CerradoEl.Value, hoy)) * config.Penalizacion;
+
+        return new MetricasDto(
+            activos.Count,
+            activos.Sum(a => a.Total),
+            activos.Sum(a => a.Saldo),
+            activos.Count(PorVencer),
+            delMes.Sum(TotalDeSucursal),
+            delMes.Sum(a => LineasDeSucursal(a).Sum(l => l.Ganancia)),
+            delMes.Sum(a => LineasDeSucursal(a).Sum(l => l.Cantidad)),
+            cerrados.Count > 0 ? (int)Math.Round(apartadosLiquidados * 100.0 / cerrados.Count) : 0,
+            apartados.Count(PorEntregar),
+            delMes.Count(a => a.Modalidad == ModalidadApartado.Compra),
+            penalizacionesMes,
+            stockBajo,
+            topProductos,
+            ventasUltimos7);
+    }
+
+    private static bool MismoMesMx(DateTime a, DateTime b)
+    {
+        var pa = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(a, DateTimeKind.Utc), ZonaMx);
+        var pb = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(b, DateTimeKind.Utc), ZonaMx);
+        return pa.Year == pb.Year && pa.Month == pb.Month;
+    }
+
     private static bool PorVencer(Apartado a) =>
         a.Estado == EstadoApartado.Activo && (a.VenceEl.Date - DateTime.UtcNow.Date).TotalDays <= 3;
 

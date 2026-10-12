@@ -55,6 +55,12 @@ public interface IApartadoService
     Task<List<ApartadoDto>> ListarAsync(string? estado, string? texto, string? tipo, CancellationToken ct = default);
     Task<ApartadoDto> ObtenerAsync(string id, CancellationToken ct = default);
     Task<List<ApartadoDto>> ListarDeClientaAsync(string clientaId, CancellationToken ct = default);
+
+    /// <summary>Corte del día de una sucursal: ventas liquidadas y cerradas ese día (hora de México).</summary>
+    Task<CorteDiaDto> CorteDiaAsync(string sucursal, CancellationToken ct = default);
+
+    /// <summary>Métricas del dashboard de la dueña, opcionalmente filtradas por sucursal.</summary>
+    Task<MetricasDto> MetricasAsync(string? sucursal, CancellationToken ct = default);
 }
 
 /// <summary>Configuración de negocio de la boutique.</summary>

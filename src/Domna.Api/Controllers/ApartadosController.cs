@@ -65,4 +65,16 @@ public class ApartadosController : ControllerBase
     [Authorize(Roles = "duena,cajera")]
     public async Task<ActionResult<ApartadoDto>> AvanzarEntrega(string id, AvanzarEntregaInput input, CancellationToken ct)
         => Ok(await _apartados.AvanzarEntregaAsync(id, input.Siguiente, ct));
+
+    /// <summary>Corte del día de una sucursal (lo que ve la cajera).</summary>
+    [HttpGet("corte/{sucursal}")]
+    [Authorize(Roles = "duena,cajera")]
+    public async Task<ActionResult<CorteDiaDto>> CorteDia(string sucursal, CancellationToken ct)
+        => Ok(await _apartados.CorteDiaAsync(sucursal, ct));
+
+    /// <summary>Métricas del dashboard de la dueña (opcionalmente filtradas por sucursal).</summary>
+    [HttpGet("metricas")]
+    [Authorize(Roles = "duena")]
+    public async Task<ActionResult<MetricasDto>> Metricas([FromQuery] string? sucursal, CancellationToken ct)
+        => Ok(await _apartados.MetricasAsync(sucursal, ct));
 }
