@@ -96,6 +96,12 @@ public class ProductoRepoFake : IProductoRepository
         return Task.CompletedTask;
     }
 
+    public Task EliminarAsync(Producto producto, CancellationToken ct = default)
+    {
+        _productos.RemoveAll(p => p.Id == producto.Id);
+        return Task.CompletedTask;
+    }
+
     public Task GuardarAsync(CancellationToken ct = default) => Task.CompletedTask;
 
     public Task<int> ContarPorCategoriaAsync(string categoriaId, CancellationToken ct = default)

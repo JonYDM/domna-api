@@ -136,6 +136,64 @@ public class ProductoServiceTests
     }
 
     [Fact]
+    public async Task Desactivar_y_activar_cambian_el_estado()
+    {
+        var repo = new ProductoRepoFake();
+        var svc = Crear(repo);
+        var dto = await svc.CrearAsync(NuevoVestido());
+
+        await svc.DesactivarAsync(dto.Id);
+        Assert.False((await svc.ObtenerAsync(dto.Id)).Activo);
+
+        await svc.ActivarAsync(dto.Id);
+        Assert.True((await svc.ObtenerAsync(dto.Id)).Activo);
+    }
+
+    [Fact]
+    public async Task EliminarPermanente_rechaza_si_esta_activo()
+    {
+        var repo = new ProductoRepoFake();
+        var svc = Crear(repo);
+        var dto = await svc.CrearAsync(NuevoVestido());
+
+        var ex = await Assert.ThrowsAsync<DomnaException>(() => svc.EliminarPermanenteAsync(dto.Id));
+        Assert.Equal(409, ex.StatusCode);
+    }
+
+    [Fact]
+    public async Task EliminarPermanente_rechaza_si_tiene_stock_fisico()
+    {
+        var repo = new ProductoRepoFake();
+        var svc = Crear(repo);
+        var dto = await svc.CrearAsync(NuevoVestido()); // nace con stock > 0
+        await svc.DesactivarAsync(dto.Id);
+
+        var ex = await Assert.ThrowsAsync<DomnaException>(() => svc.EliminarPermanenteAsync(dto.Id));
+        Assert.Equal(409, ex.StatusCode);
+        Assert.Contains("inventario", ex.Message);
+    }
+
+    [Fact]
+    public async Task EliminarPermanente_borra_el_producto_cuando_esta_inactivo_y_sin_stock()
+    {
+        var repo = new ProductoRepoFake();
+        var svc = Crear(repo);
+        var dto = await svc.CrearAsync(NuevoVestido());
+        // Pone en cero el stock de todas las variantes en ambas sucursales.
+        foreach (var v in dto.Variantes)
+        {
+            await svc.AjustarStockAsync(dto.Id, new AjusteStockInput(v.Id, "temixco", 0));
+            await svc.AjustarStockAsync(dto.Id, new AjusteStockInput(v.Id, "azteca", 0));
+        }
+        await svc.DesactivarAsync(dto.Id);
+
+        await svc.EliminarPermanenteAsync(dto.Id);
+
+        var ex = await Assert.ThrowsAsync<DomnaException>(() => svc.ObtenerAsync(dto.Id));
+        Assert.Equal(404, ex.StatusCode);
+    }
+
+    [Fact]
     public async Task Crear_rechaza_categoria_inexistente()
     {
         var repo = new ProductoRepoFake();

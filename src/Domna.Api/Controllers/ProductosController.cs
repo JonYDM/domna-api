@@ -107,4 +107,24 @@ public class ProductosController : ControllerBase
         await _productos.DesactivarAsync(id, ct);
         return NoContent();
     }
+
+    /// <summary>Reactiva una prenda dada de baja (vuelve a verse en el catálogo).</summary>
+    [HttpPost("{id}/activar")]
+    [Authorize(Roles = "duena")]
+    public async Task<IActionResult> Activar(string id, CancellationToken ct)
+    {
+        await _productos.ActivarAsync(id, ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Borrado físico permanente (irreversible): solo si está inactiva y sin stock físico.
+    /// </summary>
+    [HttpDelete("{id}/permanente")]
+    [Authorize(Roles = "duena")]
+    public async Task<IActionResult> EliminarPermanente(string id, CancellationToken ct)
+    {
+        await _productos.EliminarPermanenteAsync(id, ct);
+        return NoContent();
+    }
 }

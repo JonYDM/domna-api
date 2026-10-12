@@ -27,6 +27,7 @@ public interface IProductoRepository
     Task<List<Producto>> ListarAsync(bool incluirInactivos, CancellationToken ct = default);
     Task<Producto?> BuscarPorCodigoBarrasAsync(string codigo, CancellationToken ct = default);
     Task AgregarAsync(Producto producto, CancellationToken ct = default);
+    Task EliminarAsync(Producto producto, CancellationToken ct = default);
     Task GuardarAsync(CancellationToken ct = default);
 
     /// <summary>Cuántas prendas usan una categoría (para no borrar categorías en uso).</summary>

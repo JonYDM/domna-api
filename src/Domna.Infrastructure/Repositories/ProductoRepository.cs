@@ -41,6 +41,12 @@ public class ProductoRepository : IProductoRepository
     public async Task AgregarAsync(Producto producto, CancellationToken ct = default) =>
         await _db.Productos.AddAsync(producto, ct);
 
+    public Task EliminarAsync(Producto producto, CancellationToken ct = default)
+    {
+        _db.Productos.Remove(producto);
+        return Task.CompletedTask;
+    }
+
     public Task GuardarAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
 
     public Task<int> ContarPorCategoriaAsync(string categoriaId, CancellationToken ct = default) =>

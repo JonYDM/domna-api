@@ -47,6 +47,10 @@ public interface IProductoService
     Task<ProductoDto> AgregarImagenesColorAsync(string id, string colorId, List<string> urls, CancellationToken ct = default);
     Task<ProductoDto> QuitarColorAsync(string id, string colorId, CancellationToken ct = default);
     Task DesactivarAsync(string id, CancellationToken ct = default);
+    Task ActivarAsync(string id, CancellationToken ct = default);
+
+    /// <summary>Borrado físico permanente: solo si está inactiva y sin stock físico.</summary>
+    Task EliminarPermanenteAsync(string id, CancellationToken ct = default);
 }
 
 /// <summary>CRUD de categorías del catálogo (con sus tallas).</summary>

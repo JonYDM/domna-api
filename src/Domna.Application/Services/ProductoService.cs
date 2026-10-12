@@ -201,5 +201,32 @@ public class ProductoService : IProductoService
         await _productos.GuardarAsync(ct);
     }
 
+    public async Task ActivarAsync(string id, CancellationToken ct = default)
+    {
+        var p = await _productos.ObtenerPorIdAsync(id, ct)
+            ?? throw DomnaException.NotFound("Prenda no encontrada.");
+        p.Activar();
+        await _productos.GuardarAsync(ct);
+    }
+
+    /// <summary>
+    /// Borrado físico permanente (irreversible): solo si está inactiva (baja lógica previa) y sin
+    /// stock físico en ninguna sucursal. El módulo de apartados/ventas aún no existe en el backend
+    /// (TODO: cuando exista, validar aquí también que no tenga apartados ni entregas pendientes).
+    /// </summary>
+    public async Task EliminarPermanenteAsync(string id, CancellationToken ct = default)
+    {
+        var p = await _productos.ObtenerPorIdAsync(id, ct)
+            ?? throw DomnaException.NotFound("Prenda no encontrada.");
+        if (p.Activo)
+            throw DomnaException.Conflict("Primero oculta la prenda de la tienda antes de eliminarla.");
+        var stockFisico = p.Variantes.Sum(v => v.StockTotal);
+        if (stockFisico > 0)
+            throw DomnaException.Conflict($"Todavía tiene {stockFisico} piezas en inventario. Pon el stock en cero antes de eliminarla.");
+
+        await _productos.EliminarAsync(p, ct);
+        await _productos.GuardarAsync(ct);
+    }
+
     private static string NuevoId() => $"p-{Guid.NewGuid():N}"[..12];
 }
