@@ -14,6 +14,13 @@ public interface IAuthService
     Task<SesionDto> ConfirmarRecuperacionAsync(ConfirmarRecuperacionInput input, CancellationToken ct = default);
 }
 
+/// <summary>Casos de uso del equipo (dueña y cajeras) para el panel de Personal.</summary>
+public interface IPersonalService
+{
+    Task<List<ClientaDto>> ListarAsync(CancellationToken ct = default);
+    Task<ClientaDto> CrearCajeraAsync(CrearCajeraInput input, CancellationToken ct = default);
+}
+
 /// <summary>Casos de uso del CRUD de prenda.</summary>
 public interface IProductoService
 {

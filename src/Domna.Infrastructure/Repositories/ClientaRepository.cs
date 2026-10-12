@@ -20,6 +20,13 @@ public class ClientaRepository : IClientaRepository
     public Task<Clienta?> ObtenerPorEmailAsync(string email, CancellationToken ct = default) =>
         _db.Clientas.FirstOrDefaultAsync(c => c.Email == email, ct);
 
+    public Task<List<Clienta>> ListarStaffAsync(CancellationToken ct = default) =>
+        _db.Clientas
+            .Where(c => c.Rol != Rol.Clienta)
+            .OrderBy(c => c.Rol)
+            .ThenBy(c => c.Nombre)
+            .ToListAsync(ct);
+
     public async Task AgregarAsync(Clienta clienta, CancellationToken ct = default) =>
         await _db.Clientas.AddAsync(clienta, ct);
 

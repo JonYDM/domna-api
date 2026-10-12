@@ -10,6 +10,9 @@ public interface IClientaRepository
     Task<Clienta?> ObtenerPorEmailAsync(string email, CancellationToken ct = default);
     Task AgregarAsync(Clienta clienta, CancellationToken ct = default);
 
+    /// <summary>Dueña(s) y cajeras, ordenadas por rol y nombre (para el panel de Personal).</summary>
+    Task<List<Clienta>> ListarStaffAsync(CancellationToken ct = default);
+
     Task AgregarRecuperacionAsync(RecuperacionPin recuperacion, CancellationToken ct = default);
     Task<RecuperacionPin?> ObtenerRecuperacionAsync(string token, CancellationToken ct = default);
 

@@ -54,6 +54,9 @@ public class ClientaRepoFake : IClientaRepository
     public Task<Clienta?> ObtenerPorEmailAsync(string email, CancellationToken ct = default)
         => Task.FromResult(_clientas.FirstOrDefault(c => c.Email == email));
 
+    public Task<List<Clienta>> ListarStaffAsync(CancellationToken ct = default)
+        => Task.FromResult(_clientas.Where(c => c.Rol != Rol.Clienta).OrderBy(c => c.Rol).ThenBy(c => c.Nombre).ToList());
+
     public Task AgregarAsync(Clienta clienta, CancellationToken ct = default)
     {
         _clientas.Add(clienta);
