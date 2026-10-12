@@ -20,18 +20,28 @@ public static class Mapper
         c.PenalizacionPendiente,
         c.Activo);
 
-    public static VarianteDto ToDto(this Variante v) => new(
-        v.Id,
-        v.ProductoId,
-        v.Talla,
-        v.ColorId,
-        v.Sku,
-        v.CodigoBarras,
-        new Dictionary<string, int>
-        {
-            ["temixco"] = v.StockDe(SucursalId.Temixco),
-            ["azteca"] = v.StockDe(SucursalId.Azteca)
-        });
+    public static VarianteDto ToDto(this Variante v, Dictionary<string, int>? reservado = null)
+    {
+        var resTemixco = reservado?.GetValueOrDefault("temixco") ?? 0;
+        var resAzteca = reservado?.GetValueOrDefault("azteca") ?? 0;
+        var dispTemixco = Math.Max(0, v.StockDe(SucursalId.Temixco) - resTemixco);
+        var dispAzteca = Math.Max(0, v.StockDe(SucursalId.Azteca) - resAzteca);
+        return new(
+            v.Id,
+            v.ProductoId,
+            v.Talla,
+            v.ColorId,
+            v.Sku,
+            v.CodigoBarras,
+            new Dictionary<string, int>
+            {
+                ["temixco"] = v.StockDe(SucursalId.Temixco),
+                ["azteca"] = v.StockDe(SucursalId.Azteca)
+            },
+            dispTemixco + dispAzteca,
+            new Dictionary<string, int> { ["temixco"] = dispTemixco, ["azteca"] = dispAzteca },
+            new Dictionary<string, int> { ["temixco"] = resTemixco, ["azteca"] = resAzteca });
+    }
 
     public static ColorProductoDto ToDto(this ColorProducto c) => new(
         c.Id,
@@ -39,7 +49,7 @@ public static class Mapper
         c.Hex,
         EnumMap.Familia(c.Familia));
 
-    public static ProductoDto ToDto(this Producto p) => new(
+    public static ProductoDto ToDto(this Producto p, Dictionary<string, Dictionary<string, int>>? reservadoPorVariante = null) => new(
         p.Id,
         p.Nombre,
         p.Descripcion,
@@ -53,7 +63,7 @@ public static class Mapper
         p.PermiteApartado,
         p.Colores.Select(c => c.ToDto()).ToList(),
         p.Tallas.ToList(),
-        p.Variantes.Select(v => v.ToDto()).ToList(),
+        p.Variantes.Select(v => v.ToDto(reservadoPorVariante?.GetValueOrDefault(v.Id))).ToList(),
         p.Imagenes.OrderBy(i => i.Orden).Select(i => new ImagenProductoDto(i.Url, i.ColorId)).ToList(),
         p.Creado,
         p.ReabastecidoEl);

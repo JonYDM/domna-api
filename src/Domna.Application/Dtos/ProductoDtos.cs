@@ -11,7 +11,10 @@ public record VarianteDto(
     string ColorId,
     string Sku,
     string? CodigoBarras,
-    Dictionary<string, int> Stock);
+    Dictionary<string, int> Stock,
+    int Disponible,
+    Dictionary<string, int> DisponiblePorSucursal,
+    Dictionary<string, int> ReservadoPorSucursal);
 
 /// <summary>Producto completo con sus colores y variantes. Equivale a la interfaz Producto del front.</summary>
 public record ProductoDto(

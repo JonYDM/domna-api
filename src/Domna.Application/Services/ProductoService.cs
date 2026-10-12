@@ -13,26 +13,43 @@ public class ProductoService : IProductoService
 {
     private readonly IProductoRepository _productos;
     private readonly ICategoriaRepository _categorias;
+    private readonly IApartadoRepository _apartados;
     private readonly IReloj _reloj;
 
-    public ProductoService(IProductoRepository productos, ICategoriaRepository categorias, IReloj reloj)
+    public ProductoService(IProductoRepository productos, ICategoriaRepository categorias, IApartadoRepository apartados, IReloj reloj)
     {
         _productos = productos;
         _categorias = categorias;
+        _apartados = apartados;
         _reloj = reloj;
+    }
+
+    /// <summary>Calcula el reservado real (apartados activos) de todas las variantes de una lista de productos.</summary>
+    private async Task<Dictionary<string, Dictionary<string, int>>> ReservadoDeAsync(IEnumerable<Producto> productos, CancellationToken ct)
+    {
+        var varianteIds = productos.SelectMany(p => p.Variantes).Select(v => v.Id);
+        return await _apartados.ObtenerReservadoPorVariantesAsync(varianteIds, ct);
+    }
+
+    /// <summary>Mapea un solo producto a DTO con su reservado real ya resuelto.</summary>
+    private async Task<ProductoDto> AsDtoAsync(Producto p, CancellationToken ct)
+    {
+        var reservado = await ReservadoDeAsync(new[] { p }, ct);
+        return p.ToDto(reservado);
     }
 
     public async Task<List<ProductoDto>> ListarAsync(bool incluirInactivos, CancellationToken ct = default)
     {
         var lista = await _productos.ListarAsync(incluirInactivos, ct);
-        return lista.Select(p => p.ToDto()).ToList();
+        var reservado = await ReservadoDeAsync(lista, ct);
+        return lista.Select(p => p.ToDto(reservado)).ToList();
     }
 
     public async Task<ProductoDto> ObtenerAsync(string id, CancellationToken ct = default)
     {
         var p = await _productos.ObtenerPorIdAsync(id, ct)
             ?? throw DomnaException.NotFound("Prenda no encontrada.");
-        return p.ToDto();
+        return await AsDtoAsync(p, ct);
     }
 
     public async Task<ProductoDto> BuscarPorCodigoBarrasAsync(string codigo, CancellationToken ct = default)
@@ -41,7 +58,7 @@ public class ProductoService : IProductoService
             throw DomnaException.BadRequest("Escanea o escribe un código.");
         var p = await _productos.BuscarPorCodigoBarrasAsync(codigo.Trim(), ct)
             ?? throw DomnaException.NotFound("Ninguna prenda con ese código de barras.");
-        return p.ToDto();
+        return await AsDtoAsync(p, ct);
     }
 
     public async Task<ProductoDto> CrearAsync(NuevoProductoInput input, CancellationToken ct = default)
@@ -104,7 +121,7 @@ public class ProductoService : IProductoService
 
         await _productos.AgregarAsync(producto, ct);
         await _productos.GuardarAsync(ct);
-        return producto.ToDto();
+        return await AsDtoAsync(producto, ct);
     }
 
     public async Task<ProductoDto> EditarAsync(string id, EditarProductoInput input, CancellationToken ct = default)
@@ -120,7 +137,7 @@ public class ProductoService : IProductoService
         p.CambiarPermiteApartado(input.PermiteApartado);
 
         await _productos.GuardarAsync(ct);
-        return p.ToDto();
+        return await AsDtoAsync(p, ct);
     }
 
     public async Task<ProductoDto> AjustarStockAsync(string id, AjusteStockInput input, CancellationToken ct = default)
@@ -130,7 +147,7 @@ public class ProductoService : IProductoService
 
         p.AjustarStock(input.VarianteId, EnumMap.Sucursal(input.Sucursal), input.Nuevo, _reloj.Ahora);
         await _productos.GuardarAsync(ct);
-        return p.ToDto();
+        return await AsDtoAsync(p, ct);
     }
 
     public async Task<ProductoDto> AgregarColorAsync(string id, AgregarColorInput input, CancellationToken ct = default)
@@ -161,7 +178,7 @@ public class ProductoService : IProductoService
             _reloj.Ahora);
 
         await _productos.GuardarAsync(ct);
-        return p.ToDto();
+        return await AsDtoAsync(p, ct);
     }
 
     public async Task<ProductoDto> QuitarImagenAsync(string id, string url, CancellationToken ct = default)
@@ -170,7 +187,7 @@ public class ProductoService : IProductoService
             ?? throw DomnaException.NotFound("Prenda no encontrada.");
         p.QuitarImagen(url);
         await _productos.GuardarAsync(ct);
-        return p.ToDto();
+        return await AsDtoAsync(p, ct);
     }
 
     public async Task<ProductoDto> AgregarImagenesColorAsync(string id, string colorId, List<string> urls, CancellationToken ct = default)
@@ -179,18 +196,20 @@ public class ProductoService : IProductoService
             ?? throw DomnaException.NotFound("Prenda no encontrada.");
         p.AgregarImagenesAColor(colorId, urls);
         await _productos.GuardarAsync(ct);
-        return p.ToDto();
+        return await AsDtoAsync(p, ct);
     }
 
     public async Task<ProductoDto> QuitarColorAsync(string id, string colorId, CancellationToken ct = default)
     {
         var p = await _productos.ObtenerPorIdAsync(id, ct)
             ?? throw DomnaException.NotFound("Prenda no encontrada.");
-        // TODO(apartados): cuando exista el módulo de apartados en el backend, calcular aquí si el
-        // color tiene apartados activos y pasarlo. Hoy el backend no gestiona apartados ⇒ false.
-        p.QuitarColor(colorId, tieneApartados: false);
+        // No se puede quitar un color con piezas reservadas en apartados activos (se rompería el pedido).
+        var varianteIds = p.Variantes.Where(v => v.ColorId == colorId).Select(v => v.Id);
+        var reservado = await _apartados.ObtenerReservadoPorVariantesAsync(varianteIds, ct);
+        var tieneApartados = reservado.Values.Any(r => r.Values.Sum() > 0);
+        p.QuitarColor(colorId, tieneApartados);
         await _productos.GuardarAsync(ct);
-        return p.ToDto();
+        return await AsDtoAsync(p, ct);
     }
 
     public async Task DesactivarAsync(string id, CancellationToken ct = default)
@@ -211,8 +230,8 @@ public class ProductoService : IProductoService
 
     /// <summary>
     /// Borrado físico permanente (irreversible): solo si está inactiva (baja lógica previa) y sin
-    /// stock físico en ninguna sucursal. El módulo de apartados/ventas aún no existe en el backend
-    /// (TODO: cuando exista, validar aquí también que no tenga apartados ni entregas pendientes).
+    /// stock físico en ninguna sucursal. Esto ya cubre indirectamente "sin apartados activos": una
+    /// reserva nunca excede el stock físico, así que en cero no puede haber nada reservado.
     /// </summary>
     public async Task EliminarPermanenteAsync(string id, CancellationToken ct = default)
     {

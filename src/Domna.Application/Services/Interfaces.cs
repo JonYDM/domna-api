@@ -65,6 +65,13 @@ public interface IConfigService
     Task<ConfigBoutiqueDto> FijarCatalogoPublicoAsync(bool publico, CancellationToken ct = default);
 }
 
+/// <summary>Avisos in-app de la clienta: derivados del estado de sus apartados.</summary>
+public interface IAvisoService
+{
+    Task<List<AvisoDto>> ListarAsync(string clientaId, CancellationToken ct = default);
+    Task MarcarLeidosAsync(string clientaId, List<string> avisoIds, CancellationToken ct = default);
+}
+
 /// <summary>Casos de uso del CRUD de prenda.</summary>
 public interface IProductoService
 {

@@ -14,8 +14,8 @@ public class ProductoServiceTests
     private CategoriaRepoFake Catalogo() =>
         new(Categoria.Crear("vestidos", "Vestidos", new[] { "CH", "M", "G", "XG" }));
 
-    private ProductoService Crear(ProductoRepoFake repo, CategoriaRepoFake? categorias = null)
-        => new(repo, categorias ?? Catalogo(), _reloj);
+    private ProductoService Crear(ProductoRepoFake repo, CategoriaRepoFake? categorias = null, ApartadoRepoFake? apartados = null)
+        => new(repo, categorias ?? Catalogo(), apartados ?? new ApartadoRepoFake(), _reloj);
 
     private static NuevoProductoInput NuevoVestido() => new(
         Nombre: "Vestido Primavera",

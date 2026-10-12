@@ -133,6 +133,19 @@ namespace Domna.Infrastructure.Persistence.Migrations
                     b.ToTable("Apartados");
                 });
 
+            modelBuilder.Entity("Domna.Domain.AvisoLeido", b =>
+                {
+                    b.Property<string>("ClientaId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AvisoId")
+                        .HasColumnType("text");
+
+                    b.HasKey("ClientaId", "AvisoId");
+
+                    b.ToTable("AvisosLeidos");
+                });
+
             modelBuilder.Entity("Domna.Domain.Categoria", b =>
                 {
                     b.Property<string>("Id")

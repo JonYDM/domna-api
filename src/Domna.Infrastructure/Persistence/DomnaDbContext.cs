@@ -24,6 +24,7 @@ public class DomnaDbContext : DbContext
     public DbSet<LineaApartado> LineasApartado => Set<LineaApartado>();
     public DbSet<Abono> Abonos => Set<Abono>();
     public DbSet<ConfigBoutique> Config => Set<ConfigBoutique>();
+    public DbSet<AvisoLeido> AvisosLeidos => Set<AvisoLeido>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -131,6 +132,11 @@ public class DomnaDbContext : DbContext
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.Penalizacion).HasPrecision(12, 2);
+        });
+
+        b.Entity<AvisoLeido>(e =>
+        {
+            e.HasKey(x => new { x.ClientaId, x.AvisoId });
         });
     }
 }

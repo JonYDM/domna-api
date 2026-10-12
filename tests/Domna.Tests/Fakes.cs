@@ -172,3 +172,93 @@ public class ColorRepoFake : IColorRepository
 
     public Task GuardarAsync(CancellationToken ct = default) => Task.CompletedTask;
 }
+
+/// <summary>Repositorio de apartados en memoria, con el cálculo on-the-fly de reservado (igual al real).</summary>
+public class ApartadoRepoFake : IApartadoRepository
+{
+    private readonly List<Apartado> _apartados = new();
+
+    public ApartadoRepoFake(params Apartado[] iniciales) => _apartados.AddRange(iniciales);
+
+    public Task<Apartado?> ObtenerPorIdAsync(string id, CancellationToken ct = default)
+        => Task.FromResult(_apartados.FirstOrDefault(a => a.Id == id));
+
+    public Task<List<Apartado>> ListarAsync(CancellationToken ct = default)
+        => Task.FromResult(_apartados.OrderByDescending(a => a.Creado).ToList());
+
+    public Task<List<Apartado>> ListarDeClientaAsync(string clientaId, CancellationToken ct = default)
+        => Task.FromResult(_apartados.Where(a => a.ClientaId == clientaId).OrderByDescending(a => a.Creado).ToList());
+
+    public Task<int> ContarActivosDeClientaAsync(string clientaId, CancellationToken ct = default)
+        => Task.FromResult(_apartados.Count(a => a.ClientaId == clientaId && a.Estado == EstadoApartado.Activo));
+
+    public Task<List<Apartado>> ListarActivosVencidosAsync(DateTime hoy, CancellationToken ct = default)
+        => Task.FromResult(_apartados.Where(a => a.Estado == EstadoApartado.Activo && a.VenceEl <= hoy).ToList());
+
+    public Task<Dictionary<string, int>> ObtenerReservadoAsync(string varianteId, CancellationToken ct = default)
+    {
+        var filas = _apartados
+            .Where(a => a.Estado == EstadoApartado.Activo)
+            .SelectMany(a => a.Lineas)
+            .Where(l => l.VarianteId == varianteId)
+            .GroupBy(l => l.SucursalOrigen)
+            .ToDictionary(g => g.Key == SucursalId.Temixco ? "temixco" : "azteca", g => g.Sum(l => l.Cantidad));
+        return Task.FromResult(filas);
+    }
+
+    public Task<Dictionary<string, Dictionary<string, int>>> ObtenerReservadoPorVariantesAsync(
+        IEnumerable<string> varianteIds, CancellationToken ct = default)
+    {
+        var ids = varianteIds.ToHashSet();
+        var resultado = _apartados
+            .Where(a => a.Estado == EstadoApartado.Activo)
+            .SelectMany(a => a.Lineas)
+            .Where(l => ids.Contains(l.VarianteId))
+            .GroupBy(l => l.VarianteId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.GroupBy(l => l.SucursalOrigen)
+                    .ToDictionary(gg => gg.Key == SucursalId.Temixco ? "temixco" : "azteca", gg => gg.Sum(l => l.Cantidad)));
+        return Task.FromResult(resultado);
+    }
+
+    public Task AgregarAsync(Apartado apartado, CancellationToken ct = default)
+    {
+        _apartados.Add(apartado);
+        return Task.CompletedTask;
+    }
+
+    public Task GuardarAsync(CancellationToken ct = default) => Task.CompletedTask;
+}
+
+/// <summary>Config en memoria, ya creada con defaults (no simula el "crear si no existe").</summary>
+public class ConfigRepoFake : IConfigRepository
+{
+    public ConfigBoutique Config { get; }
+
+    public ConfigRepoFake(ConfigBoutique? config = null) =>
+        Config = config ?? ConfigBoutique.CrearDefault("Jesly Boutique", "jesly-boutique");
+
+    public Task<ConfigBoutique> ObtenerAsync(CancellationToken ct = default) => Task.FromResult(Config);
+    public Task GuardarAsync(CancellationToken ct = default) => Task.CompletedTask;
+}
+
+/// <summary>Avisos leídos en memoria.</summary>
+public class AvisoRepoFake : IAvisoRepository
+{
+    private readonly Dictionary<string, HashSet<string>> _leidos = new();
+
+    public Task<HashSet<string>> ObtenerLeidosAsync(string clientaId, CancellationToken ct = default)
+        => Task.FromResult(_leidos.TryGetValue(clientaId, out var s) ? new HashSet<string>(s) : new HashSet<string>());
+
+    public Task MarcarLeidosAsync(string clientaId, IEnumerable<string> avisoIds, CancellationToken ct = default)
+    {
+        if (!_leidos.TryGetValue(clientaId, out var s))
+        {
+            s = new HashSet<string>();
+            _leidos[clientaId] = s;
+        }
+        foreach (var id in avisoIds) s.Add(id);
+        return Task.CompletedTask;
+    }
+}

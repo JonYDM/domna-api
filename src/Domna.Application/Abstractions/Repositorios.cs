@@ -92,3 +92,10 @@ public interface IConfigRepository
     Task<ConfigBoutique> ObtenerAsync(CancellationToken ct = default);
     Task GuardarAsync(CancellationToken ct = default);
 }
+
+/// <summary>Qué avisos ya leyó cada clienta. Los avisos mismos se derivan, no se persisten.</summary>
+public interface IAvisoRepository
+{
+    Task<HashSet<string>> ObtenerLeidosAsync(string clientaId, CancellationToken ct = default);
+    Task MarcarLeidosAsync(string clientaId, IEnumerable<string> avisoIds, CancellationToken ct = default);
+}
