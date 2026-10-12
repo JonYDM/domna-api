@@ -27,6 +27,12 @@ public class ClientaRepository : IClientaRepository
             .ThenBy(c => c.Nombre)
             .ToListAsync(ct);
 
+    public Task<List<Clienta>> ListarClientasAsync(CancellationToken ct = default) =>
+        _db.Clientas
+            .Where(c => c.Rol == Rol.Clienta)
+            .OrderByDescending(c => c.Creada)
+            .ToListAsync(ct);
+
     public async Task AgregarAsync(Clienta clienta, CancellationToken ct = default) =>
         await _db.Clientas.AddAsync(clienta, ct);
 

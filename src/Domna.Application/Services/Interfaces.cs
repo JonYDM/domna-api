@@ -33,6 +33,17 @@ public interface IPersonalService
     Task<ClientaDto> ActivarAsync(string id, CancellationToken ct = default);
 }
 
+/// <summary>Casos de uso del panel de Clientas (dueña): listar, resumen y ficha.</summary>
+public interface IClientasPanelService
+{
+    Task<List<ClientaResumenDto>> ListarAsync(string filtro, string? texto, CancellationToken ct = default);
+    Task<ResumenClientasDto> ResumenAsync(CancellationToken ct = default);
+    Task<ClientaResumenDto> ObtenerAsync(string id, CancellationToken ct = default);
+
+    /// <summary>Alta en mostrador: la clienta nace sin PIN (sin acceso) hasta que se registre.</summary>
+    Task<ClientaDto> CrearAsync(CrearClientaInput input, CancellationToken ct = default);
+}
+
 /// <summary>Casos de uso del CRUD de prenda.</summary>
 public interface IProductoService
 {

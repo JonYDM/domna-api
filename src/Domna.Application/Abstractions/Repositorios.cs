@@ -13,6 +13,9 @@ public interface IClientaRepository
     /// <summary>Dueña(s) y cajeras, ordenadas por rol y nombre (para el panel de Personal).</summary>
     Task<List<Clienta>> ListarStaffAsync(CancellationToken ct = default);
 
+    /// <summary>Solo rol Clienta, para el panel de Clientas de la dueña (no incluye staff).</summary>
+    Task<List<Clienta>> ListarClientasAsync(CancellationToken ct = default);
+
     Task AgregarRecuperacionAsync(RecuperacionPin recuperacion, CancellationToken ct = default);
     Task<RecuperacionPin?> ObtenerRecuperacionAsync(string token, CancellationToken ct = default);
 

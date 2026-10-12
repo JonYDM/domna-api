@@ -57,6 +57,9 @@ public class ClientaRepoFake : IClientaRepository
     public Task<List<Clienta>> ListarStaffAsync(CancellationToken ct = default)
         => Task.FromResult(_clientas.Where(c => c.Rol != Rol.Clienta).OrderBy(c => c.Rol).ThenBy(c => c.Nombre).ToList());
 
+    public Task<List<Clienta>> ListarClientasAsync(CancellationToken ct = default)
+        => Task.FromResult(_clientas.Where(c => c.Rol == Rol.Clienta).OrderByDescending(c => c.Creada).ToList());
+
     public Task AgregarAsync(Clienta clienta, CancellationToken ct = default)
     {
         _clientas.Add(clienta);
