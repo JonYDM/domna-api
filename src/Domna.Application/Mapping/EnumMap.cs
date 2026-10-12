@@ -112,4 +112,14 @@ public static class EnumMap
     public static string Metodo(MetodoPago valor) => valor.ToString().ToLowerInvariant();
 
     public static string Concepto(ConceptoAbono valor) => valor.ToString().ToLowerInvariant();
+
+    public static MotivoAjuste Motivo(string? valor) => valor?.Trim().ToLowerInvariant() switch
+    {
+        "entrada" => MotivoAjuste.Entrada,
+        "conteo" => MotivoAjuste.Conteo,
+        "merma" => MotivoAjuste.Merma,
+        "devolucion" => MotivoAjuste.Devolucion,
+        "traspaso" => MotivoAjuste.Traspaso,
+        _ => throw DomnaException.BadRequest($"Motivo inválido: '{valor}'.")
+    };
 }

@@ -29,6 +29,9 @@ public interface IProductoRepository
     Task<Producto?> ObtenerPorIdAsync(string id, CancellationToken ct = default);
     Task<List<Producto>> ListarAsync(bool incluirInactivos, CancellationToken ct = default);
     Task<Producto?> BuscarPorCodigoBarrasAsync(string codigo, CancellationToken ct = default);
+
+    /// <summary>El producto que contiene una variante (con colores, variantes e imágenes).</summary>
+    Task<Producto?> ObtenerPorVarianteAsync(string varianteId, CancellationToken ct = default);
     Task AgregarAsync(Producto producto, CancellationToken ct = default);
     Task EliminarAsync(Producto producto, CancellationToken ct = default);
     Task GuardarAsync(CancellationToken ct = default);
@@ -98,4 +101,12 @@ public interface IAvisoRepository
 {
     Task<HashSet<string>> ObtenerLeidosAsync(string clientaId, CancellationToken ct = default);
     Task MarcarLeidosAsync(string clientaId, IEnumerable<string> avisoIds, CancellationToken ct = default);
+}
+
+
+/// <summary>Historial de movimientos de inventario. AgregarAsync no guarda: se persiste junto con el producto.</summary>
+public interface IMovimientoRepository
+{
+    Task AgregarAsync(MovimientoInventario movimiento, CancellationToken ct = default);
+    Task<List<MovimientoInventario>> ListarDeProductoAsync(string productoId, CancellationToken ct = default);
 }

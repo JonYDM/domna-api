@@ -97,3 +97,15 @@ public record QuitarImagenInput(string Url);
 
 /// <summary>Agregar fotos (URLs ya subidas a R2) a un color existente.</summary>
 public record AgregarImagenesInput(List<string> Urls);
+
+
+/// <summary>Un cambio de stock físico: valor absoluto (no delta), para que dos ediciones no se pisen.</summary>
+public record CambioStockInput(string VarianteId, string Sucursal, int Nuevo);
+
+/// <summary>Guardar varios cambios de stock de una prenda, todo o nada, con un motivo.</summary>
+public record GuardarStockInput(List<CambioStockInput> Cambios, string Motivo);
+
+/// <summary>Mueve piezas disponibles de una sucursal a la otra.</summary>
+public record MoverStockInput(string VarianteId, string Desde, int Cantidad);
+
+public record GuardarStockResultado(int Actualizados);

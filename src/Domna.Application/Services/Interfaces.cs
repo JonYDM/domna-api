@@ -98,6 +98,13 @@ public interface IProductoService
     Task EliminarPermanenteAsync(string id, CancellationToken ct = default);
 }
 
+/// <summary>Movimientos de inventario con historial (guardar en lote, mover entre sucursales).</summary>
+public interface IStockService
+{
+    Task<GuardarStockResultado> GuardarLoteAsync(string productoId, GuardarStockInput input, CancellationToken ct = default);
+    Task MoverAsync(MoverStockInput input, CancellationToken ct = default);
+}
+
 /// <summary>CRUD de categorías del catálogo (con sus tallas).</summary>
 public interface ICategoriaService
 {

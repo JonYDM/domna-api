@@ -407,6 +407,40 @@ namespace Domna.Infrastructure.Persistence.Migrations
                     b.ToTable("LineasApartado");
                 });
 
+            modelBuilder.Entity("Domna.Domain.MovimientoInventario", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Delta")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProductoId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Sucursal")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("VarianteId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductoId", "Fecha");
+
+                    b.ToTable("Movimientos");
+                });
+
             modelBuilder.Entity("Domna.Domain.Producto", b =>
                 {
                     b.Property<string>("Id")

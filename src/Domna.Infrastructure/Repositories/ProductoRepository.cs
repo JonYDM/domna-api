@@ -38,6 +38,12 @@ public class ProductoRepository : IProductoRepository
         return await ObtenerPorIdAsync(variante.ProductoId, ct);
     }
 
+    public async Task<Producto?> ObtenerPorVarianteAsync(string varianteId, CancellationToken ct = default)
+    {
+        var variante = await _db.Variantes.FirstOrDefaultAsync(v => v.Id == varianteId, ct);
+        return variante is null ? null : await ObtenerPorIdAsync(variante.ProductoId, ct);
+    }
+
     public async Task AgregarAsync(Producto producto, CancellationToken ct = default) =>
         await _db.Productos.AddAsync(producto, ct);
 

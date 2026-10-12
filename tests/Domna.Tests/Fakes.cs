@@ -99,6 +99,9 @@ public class ProductoRepoFake : IProductoRepository
         return Task.CompletedTask;
     }
 
+    public Task<Producto?> ObtenerPorVarianteAsync(string varianteId, CancellationToken ct = default)
+        => Task.FromResult(_productos.FirstOrDefault(p => p.Variantes.Any(v => v.Id == varianteId)));
+
     public Task EliminarAsync(Producto producto, CancellationToken ct = default)
     {
         _productos.RemoveAll(p => p.Id == producto.Id);
@@ -261,4 +264,19 @@ public class AvisoRepoFake : IAvisoRepository
         foreach (var id in avisoIds) s.Add(id);
         return Task.CompletedTask;
     }
+}
+
+/// <summary>Historial de movimientos en memoria.</summary>
+public class MovimientoRepoFake : IMovimientoRepository
+{
+    public List<MovimientoInventario> Todos { get; } = new();
+
+    public Task AgregarAsync(MovimientoInventario movimiento, CancellationToken ct = default)
+    {
+        Todos.Add(movimiento);
+        return Task.CompletedTask;
+    }
+
+    public Task<List<MovimientoInventario>> ListarDeProductoAsync(string productoId, CancellationToken ct = default)
+        => Task.FromResult(Todos.Where(m => m.ProductoId == productoId).OrderByDescending(m => m.Fecha).ToList());
 }

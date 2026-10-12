@@ -97,3 +97,14 @@ public enum ConceptoAbono
     Liquidacion,
     Compra
 }
+
+
+/// <summary>Por qué cambió el stock físico (queda en el historial de movimientos).</summary>
+public enum MotivoAjuste
+{
+    Entrada,
+    Conteo,
+    Merma,
+    Devolucion,
+    Traspaso
+}

@@ -25,6 +25,7 @@ public class DomnaDbContext : DbContext
     public DbSet<Abono> Abonos => Set<Abono>();
     public DbSet<ConfigBoutique> Config => Set<ConfigBoutique>();
     public DbSet<AvisoLeido> AvisosLeidos => Set<AvisoLeido>();
+    public DbSet<MovimientoInventario> Movimientos => Set<MovimientoInventario>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -137,6 +138,14 @@ public class DomnaDbContext : DbContext
         b.Entity<AvisoLeido>(e =>
         {
             e.HasKey(x => new { x.ClientaId, x.AvisoId });
+        });
+
+        b.Entity<MovimientoInventario>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Sucursal).HasConversion<string>();
+            e.Property(x => x.Motivo).HasConversion<string>();
+            e.HasIndex(x => new { x.ProductoId, x.Fecha });
         });
     }
 }

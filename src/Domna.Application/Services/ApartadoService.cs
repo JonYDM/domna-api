@@ -216,8 +216,8 @@ public class ApartadoService : IApartadoService
         return pa.Year == pb.Year && pa.Month == pb.Month;
     }
 
-    private static bool PorVencer(Apartado a) =>
-        a.Estado == EstadoApartado.Activo && (a.VenceEl.Date - DateTime.UtcNow.Date).TotalDays <= 3;
+    private bool PorVencer(Apartado a) =>
+        a.Estado == EstadoApartado.Activo && (a.VenceEl.Date - _reloj.Ahora.Date).TotalDays <= 3;
 
     private static bool PorEntregar(Apartado a) =>
         a.Estado == EstadoApartado.Liquidado && a.EstadoEntrega != EstadoEntrega.Entregado;
@@ -226,6 +226,8 @@ public class ApartadoService : IApartadoService
 
     public async Task<CotizacionApartadoDto> CotizarAsync(string? clientaId, CrearApartadoInput input, CancellationToken ct = default)
     {
+        // Un apartado vencido aún sin procesar seguiría reservando stock: se procesa antes de calcular.
+        await ProcesarVencimientosAsync(ct);
         var hoy = _reloj.Ahora;
         var penalizacionPendiente = 0m;
         if (!string.IsNullOrEmpty(clientaId))
@@ -282,6 +284,8 @@ public class ApartadoService : IApartadoService
 
     public async Task<ApartadoDto> CrearAsync(string? clientaId, CrearApartadoInput input, CancellationToken ct = default)
     {
+        // Libera reservas y cuenta penalizaciones de apartados vencidos antes de validar límite y stock.
+        await ProcesarVencimientosAsync(ct);
         var hoy = _reloj.Ahora;
         var config = await _config.ObtenerAsync(ct);
         if (config.Suspendida)

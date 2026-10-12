@@ -145,7 +145,14 @@ public class ProductoService : IProductoService
         var p = await _productos.ObtenerPorIdAsync(id, ct)
             ?? throw DomnaException.NotFound("Prenda no encontrada.");
 
-        p.AjustarStock(input.VarianteId, EnumMap.Sucursal(input.Sucursal), input.Nuevo, _reloj.Ahora);
+        // No se puede dejar el stock físico por debajo de lo apartado: esas piezas ya son de una clienta.
+        var sucursal = EnumMap.Sucursal(input.Sucursal);
+        var reservado = await _apartados.ObtenerReservadoAsync(input.VarianteId, ct);
+        var apartadas = reservado.GetValueOrDefault(sucursal == SucursalId.Temixco ? "temixco" : "azteca");
+        if (input.Nuevo < apartadas)
+            throw DomnaException.Conflict($"No puedes bajar el stock por debajo de lo apartado ({apartadas}).");
+
+        p.AjustarStock(input.VarianteId, sucursal, input.Nuevo, _reloj.Ahora);
         await _productos.GuardarAsync(ct);
         return await AsDtoAsync(p, ct);
     }

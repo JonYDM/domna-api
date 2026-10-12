@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IApartadoRepository, ApartadoRepository>();
         services.AddScoped<IConfigRepository, ConfigRepository>();
         services.AddScoped<IAvisoRepository, AvisoRepository>();
+        services.AddScoped<IMovimientoRepository, MovimientoRepository>();
 
         services.AddSingleton(jwtOptions);
         services.AddSingleton(correoOptions);
@@ -54,6 +55,7 @@ public static class DependencyInjection
         services.AddScoped<IConfigService, ConfigService>();
         services.AddScoped<IAvisoService, AvisoService>();
         services.AddScoped<IProductoService, ProductoService>();
+        services.AddScoped<IStockService, StockService>();
         services.AddScoped<ICategoriaService, CategoriaService>();
         services.AddScoped<IColorService, ColorService>();
 
