@@ -21,4 +21,35 @@ public interface IAlmacenamientoImagenes
     /// contentType suele ser "image/webp". Las URLs de subida expiran en minutos.
     /// </summary>
     FirmaSubida FirmarSubidaProducto(string productoId, IEnumerable<string> tamanos, string contentType);
+
+    /// <summary>
+    /// Firma la subida de un comprobante de transferencia (imagen). Va a una carpeta aparte,
+    /// <c>comprobantes/{apartadoId}/</c>, con nombre aleatorio. Nunca se devuelve una URL pública.
+    /// </summary>
+    ComprobanteFirmado FirmarSubidaComprobante(string apartadoId, string contentType);
+
+    /// <summary>Tamaño y tipo del objeto subido, o null si no existe (para validar antes de aceptarlo).</summary>
+    Task<InfoObjeto?> ObtenerInfoComprobanteAsync(string clave, CancellationToken ct = default);
+
+    /// <summary>Enlace de lectura temporal de un comprobante. Es la única forma de verlo.</summary>
+    string FirmarLecturaComprobante(string clave, TimeSpan vigencia);
+}
+
+/// <summary>A dónde sube la clienta su comprobante y la llave privada con la que queda guardado.</summary>
+public record ComprobanteFirmado(string UrlSubida, string Clave);
+
+/// <summary>Lo que se sabe de un objeto ya guardado.</summary>
+public record InfoObjeto(long Bytes, string? ContentType);
+
+/// <summary>Cuenta intentos fallidos (p. ej. de PIN) y bloquea temporalmente al pasarse del límite.</summary>
+public interface ILimitadorIntentos
+{
+    /// <summary>Cuánto falta para poder reintentar, o null si no está bloqueado.</summary>
+    TimeSpan? Bloqueo(string clave);
+
+    /// <summary>Anota un fallo. Devuelve cuántos intentos quedan antes del bloqueo (0 = ya bloqueado).</summary>
+    int RegistrarFallo(string clave);
+
+    /// <summary>Borra el historial de fallos (tras un acierto).</summary>
+    void Reiniciar(string clave);
 }

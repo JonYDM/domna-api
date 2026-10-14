@@ -32,7 +32,14 @@ namespace Domna.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("ComprobanteClave")
+                        .HasColumnType("text");
+
                     b.Property<string>("Concepto")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Estado")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -46,6 +53,15 @@ namespace Domna.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("Monto")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("MotivoRechazo")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("RevisadoEl")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RevisadoPor")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -280,6 +296,15 @@ namespace Domna.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("AnticipoPct")
                         .HasColumnType("integer");
+
+                    b.Property<string>("BancoClabe")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BancoNombre")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BancoTitular")
+                        .HasColumnType("text");
 
                     b.Property<bool>("CatalogoPublico")
                         .HasColumnType("boolean");

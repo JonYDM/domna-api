@@ -33,6 +33,37 @@ public class ConfigBoutique
 
     private ConfigBoutique() { }
 
+    /// <summary>A quién se le transfiere (nombre de la cuenta). Null = la boutique aún no los captura.</summary>
+    public string? BancoTitular { get; private set; }
+    public string? BancoNombre { get; private set; }
+
+    /// <summary>CLABE de 18 dígitos, sin espacios.</summary>
+    public string? BancoClabe { get; private set; }
+
+    public bool TieneDatosBancarios =>
+        !string.IsNullOrWhiteSpace(BancoTitular) && !string.IsNullOrWhiteSpace(BancoNombre) && !string.IsNullOrWhiteSpace(BancoClabe);
+
+    /// <summary>Fija los datos para recibir transferencias. Los tres vacíos los borran.</summary>
+    public void FijarDatosBancarios(string? titular, string? banco, string? clabe)
+    {
+        var t = Normalizacion.NormalizarNombre(titular);
+        var b = Normalizacion.NormalizarNombre(banco);
+        var c = Clabe.Limpiar(clabe);
+
+        if (t.Length == 0 && b.Length == 0 && c.Length == 0)
+        {
+            BancoTitular = BancoNombre = BancoClabe = null;
+            return;
+        }
+        if (t.Length < 2) throw DomnaException.BadRequest("Escribe el nombre del titular de la cuenta.");
+        if (b.Length < 2) throw DomnaException.BadRequest("Escribe el nombre del banco.");
+        if (!Clabe.EsValida(c)) throw DomnaException.BadRequest("La CLABE no es válida: debe tener 18 dígitos.");
+
+        BancoTitular = t;
+        BancoNombre = b;
+        BancoClabe = c;
+    }
+
     public static ConfigBoutique CrearDefault(string nombre, string slug) => new()
     {
         Nombre = nombre,

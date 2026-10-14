@@ -16,3 +16,10 @@ public record ConfigBoutiqueDto(
     int DiasNovedad,
     bool CatalogoPublico,
     List<SucursalDto> Sucursales);
+
+
+/// <summary>Cuenta donde la boutique recibe transferencias. <c>Configurados</c> = false si aún no la captura.</summary>
+public record DatosBancariosDto(string Titular, string Banco, string Clabe, bool Configurados);
+
+/// <summary>Los tres vacíos borran los datos.</summary>
+public record DatosBancariosInput(string? Titular, string? Banco, string? Clabe);

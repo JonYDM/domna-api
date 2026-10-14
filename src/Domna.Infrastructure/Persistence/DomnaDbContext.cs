@@ -127,6 +127,7 @@ public class DomnaDbContext : DbContext
             e.Property(x => x.Monto).HasPrecision(12, 2);
             e.Property(x => x.Metodo).HasConversion<string>();
             e.Property(x => x.Concepto).HasConversion<string>();
+            e.Property(x => x.Estado).HasConversion<string>();
         });
 
         b.Entity<ConfigBoutique>(e =>

@@ -21,12 +21,13 @@ public class ApartadoTests
         decimal anticipo = 0m,
         bool traslado = false,
         int venceEnDias = 2,
-        List<LineaDraft>? lineas = null) =>
+        List<LineaDraft>? lineas = null,
+        Canal canal = Canal.Fisico) =>
         Apartado.Crear(
             "ap1", "DOM-0001", "c1", "Ana Lopez", "7771234567",
             lineas ?? new List<LineaDraft> { Linea() },
             subtotal: total, penalizacion: 0m, total: total,
-            modalidad, Canal.Online, SucursalId.Temixco, traslado,
+            modalidad, canal, SucursalId.Temixco, traslado,
             Hoy, Hoy.AddDays(venceEnDias), Hoy, anticipo, MetodoPago.Efectivo, Id, Id);
 
     // ── Crear ──

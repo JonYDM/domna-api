@@ -45,7 +45,7 @@ public class ApartadoServiceTests
 
     private static CrearApartadoInput Pedido(
         string modalidad = "sin_anticipo", string entrega = "temixco", int cantidad = 1,
-        string varianteId = "v-p1", string? clientaId = "c1", string? canal = "online") =>
+        string varianteId = "v-p1", string? clientaId = "c1", string? canal = "fisico") =>
         new(new List<LineaCarritoInput> { new(varianteId, cantidad) }, modalidad, entrega, canal, clientaId, "efectivo");
 
     private static int Stock(Producto p, SucursalId s) => p.Variantes[0].StockDe(s);

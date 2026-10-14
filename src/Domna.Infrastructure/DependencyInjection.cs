@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddSingleton<IJwtGenerator, JwtGenerator>();
         services.AddSingleton<IReloj, RelojSistema>();
         services.AddSingleton<IAlmacenamientoImagenes, R2Almacenamiento>();
+        services.AddSingleton<ILimitadorIntentos, LimitadorIntentos>();
 
         // Correo real por SMTP si hay credenciales configuradas; si no, el simulado (solo loguea el token).
         if (correoOptions.Configurado)
@@ -52,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<IPersonalService, PersonalService>();
         services.AddScoped<IClientasPanelService, ClientasPanelService>();
         services.AddScoped<IApartadoService, ApartadoService>();
+        services.AddScoped<IComprobanteService, ComprobanteService>();
         services.AddScoped<IConfigService, ConfigService>();
         services.AddScoped<IAvisoService, AvisoService>();
         services.AddScoped<IProductoService, ProductoService>();

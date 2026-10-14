@@ -36,7 +36,17 @@ public record LineaApartadoDto(
     int Cantidad,
     string SucursalOrigen);
 
-public record AbonoDto(string Id, decimal Monto, DateTime Fecha, string Metodo, string Concepto);
+public record AbonoDto(
+    string Id,
+    decimal Monto,
+    DateTime Fecha,
+    string Metodo,
+    string Concepto,
+    string Estado,
+    string? RevisadoPor,
+    DateTime? RevisadoEl,
+    string? MotivoRechazo,
+    bool TieneComprobante);
 
 public record ApartadoDto(
     string Id,
@@ -55,6 +65,7 @@ public record ApartadoDto(
     string EstadoEntrega,
     List<AbonoDto> Abonos,
     decimal Pagado,
+    decimal PorConfirmar,
     decimal Saldo,
     DateTime Creado,
     DateTime VenceEl,
@@ -65,6 +76,9 @@ public record ApartadoDto(
 public record RegistrarAbonoInput(string ApartadoId, decimal Monto, string Metodo);
 
 public record AvanzarEntregaInput(string Siguiente);
+
+/// <summary>Motivo por el que la tienda no encontró el pago.</summary>
+public record RechazarPagoInput(string Motivo);
 
 /// <summary>Corte del día de una sucursal: ventas liquidadas y cerradas ese día (hora de México).</summary>
 public record CorteDiaDto(string Sucursal, string Dia, decimal VentasDia, decimal GananciaDia, int PiezasDia, int Tickets);
@@ -91,3 +105,20 @@ public record MetricasDto(
     List<StockBajoItemDto> StockBajo,
     List<TopProductoDto> TopProductos,
     List<VentaDiaDto> VentasUltimos7);
+
+
+// ── Comprobantes de transferencia ──
+
+/// <summary>Qué tipo de archivo quiere subir la clienta (solo imágenes).</summary>
+public record SubirComprobanteInput(string ContentType);
+
+/// <summary>Dónde subir y la llave con la que se registra después. La llave es opaca para la clienta.</summary>
+public record ComprobanteFirmadoDto(string UrlSubida, string Clave);
+
+public record RegistrarComprobanteInput(string Clave);
+
+/// <summary>La cajera confirma que es ella con su PIN para abrir un comprobante.</summary>
+public record VerComprobanteInput(string Pin);
+
+/// <summary>Enlace temporal a la imagen del comprobante.</summary>
+public record ComprobanteVistaDto(string Url, int ExpiraEnSegundos);

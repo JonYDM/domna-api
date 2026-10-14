@@ -38,7 +38,12 @@ public class Apartado
     public IReadOnlyList<LineaApartado> Lineas => _lineas.AsReadOnly();
     public IReadOnlyList<Abono> Abonos => _abonos.AsReadOnly();
 
-    public decimal Pagado => _abonos.Sum(a => a.Monto);
+    /// <summary>Solo cuentan los pagos confirmados por la tienda; lo que la clienta declara en línea espera revisión.</summary>
+    public decimal Pagado => _abonos.Where(a => a.Estado == EstadoPago.Confirmado).Sum(a => a.Monto);
+
+    /// <summary>Pagos declarados que la tienda aún no confirma ni rechaza.</summary>
+    public decimal PorConfirmar => _abonos.Where(a => a.Estado == EstadoPago.Pendiente).Sum(a => a.Monto);
+    public bool TienePagoPendiente => _abonos.Any(a => a.Estado == EstadoPago.Pendiente);
     public decimal Saldo => Math.Max(0, Total - Pagado);
     public int Piezas => _lineas.Sum(l => l.Cantidad);
     public decimal Ganancia => _lineas.Sum(l => l.Ganancia);
@@ -106,11 +111,14 @@ public class Apartado
         if (anticipo > 0)
         {
             var concepto = compra ? ConceptoAbono.Compra : ConceptoAbono.Anticipo;
-            a._abonos.Add(new Abono(nuevoIdAbono(), a.Id, anticipo, creado, metodoAnticipo, concepto));
+            // En línea la clienta solo declara el pago: espera confirmación. En mostrador cobra la cajera.
+            var estadoPago = canal == Canal.Online ? EstadoPago.Pendiente : EstadoPago.Confirmado;
+            a._abonos.Add(new Abono(nuevoIdAbono(), a.Id, anticipo, creado, metodoAnticipo, concepto, estadoPago));
         }
 
-        // Compra: pago completo → venta directa, se liquida de inmediato (descuenta stock físico).
-        if (compra) a.Liquidar(creado);
+        // Compra en mostrador: pago completo cobrado → venta directa, se liquida de inmediato.
+        // Compra en línea: queda activa (reservada) hasta que la tienda confirme el pago.
+        if (compra && !a.TienePagoPendiente) a.Liquidar(creado);
 
         return a;
     }
@@ -123,6 +131,8 @@ public class Apartado
     {
         if (Estado != EstadoApartado.Activo)
             throw DomnaException.BadRequest("El apartado ya no está activo.");
+        if (TienePagoPendiente)
+            throw DomnaException.BadRequest("Tiene un pago por confirmar. Confírmalo o recházalo antes de registrar otro.");
         var saldo = Saldo;
         if (monto <= 0 || monto > saldo)
             throw DomnaException.BadRequest("Monto inválido.");
@@ -138,6 +148,81 @@ public class Apartado
         }
 
         if (liquida) Liquidar(hoy);
+    }
+
+    /// <summary>
+    /// ¿Puede la clienta subir (o volver a subir) un comprobante? Mientras el pedido siga activo y
+    /// haya una transferencia declarada esperando revisión, o una que la tienda rechazó.
+    /// </summary>
+    public bool AceptaComprobante =>
+        Estado == EstadoApartado.Activo &&
+        (_abonos.Any(a => a.Estado == EstadoPago.Pendiente && a.Metodo == MetodoPago.Transferencia) ||
+         (!TienePagoPendiente && _abonos.Any(a => a.Estado == EstadoPago.Rechazado && a.Metodo == MetodoPago.Transferencia)));
+
+    /// <summary>
+    /// La clienta adjunta el comprobante de su transferencia. Si la tienda había rechazado el pago y
+    /// no hay otro pendiente, abre un pago nuevo por el mismo monto para que pueda volver a intentarlo.
+    /// </summary>
+    public void AdjuntarComprobante(string clave, Func<string> nuevoIdAbono, DateTime hoy)
+    {
+        if (Estado != EstadoApartado.Activo)
+            throw DomnaException.BadRequest("El pedido ya no está activo.");
+
+        var abono = _abonos.LastOrDefault(a => a.Estado == EstadoPago.Pendiente && a.Metodo == MetodoPago.Transferencia);
+        if (abono is null)
+        {
+            if (TienePagoPendiente)
+                throw DomnaException.BadRequest("Tu pago por otro método está por confirmar en tienda.");
+            var rechazado = _abonos.LastOrDefault(a => a.Estado == EstadoPago.Rechazado && a.Metodo == MetodoPago.Transferencia)
+                ?? throw DomnaException.BadRequest("Este pedido no espera un comprobante de transferencia.");
+            var monto = Math.Min(rechazado.Monto, Saldo);
+            if (monto <= 0) throw DomnaException.BadRequest("Este pedido ya está pagado.");
+            abono = new Abono(nuevoIdAbono(), Id, monto, hoy, MetodoPago.Transferencia, rechazado.Concepto, EstadoPago.Pendiente);
+            _abonos.Add(abono);
+        }
+        abono.AdjuntarComprobante(clave);
+    }
+
+    /// <summary>
+    /// La tienda aún revisa un comprobante: mientras tanto el pedido no vence, para no perder a la
+    /// clienta por la demora de quien lo revisa.
+    /// </summary>
+    public bool EnRevision => _abonos.Any(a => a.Estado == EstadoPago.Pendiente && a.TieneComprobante);
+
+    /// <summary>
+    /// La tienda verificó un pago declarado en línea: pasa a contar como pagado. Si cubre todo el
+    /// saldo, liquida (la reserva se vuelve venta). Si es el anticipo de un apartado, empieza la
+    /// vigencia completa de "con anticipo".
+    /// </summary>
+    public void ConfirmarPago(string abonoId, string por, DateTime hoy, int vigenciaConAnticipoDias)
+    {
+        if (Estado != EstadoApartado.Activo)
+            throw DomnaException.BadRequest("El apartado ya no está activo; el pedido regresó a la tienda.");
+        var abono = _abonos.FirstOrDefault(a => a.Id == abonoId)
+            ?? throw DomnaException.NotFound("Pago no encontrado.");
+        abono.Confirmar(por, hoy);
+
+        if (Saldo == 0)
+        {
+            Liquidar(hoy);
+            return;
+        }
+        if (Modalidad == ModalidadApartado.SinAnticipo)
+            Modalidad = ModalidadApartado.Anticipo;
+        var nuevaVigencia = hoy.AddDays(vigenciaConAnticipoDias);
+        if (nuevaVigencia > VenceEl) VenceEl = nuevaVigencia;
+    }
+
+    /// <summary>La tienda no encontró el pago. El pedido sigue activo hasta que venza; la clienta puede volver a intentarlo.</summary>
+    public void RechazarPago(string abonoId, string por, DateTime hoy, string motivo)
+    {
+        if (Estado != EstadoApartado.Activo)
+            throw DomnaException.BadRequest("El apartado ya no está activo.");
+        if (string.IsNullOrWhiteSpace(motivo))
+            throw DomnaException.BadRequest("Escribe el motivo del rechazo.");
+        var abono = _abonos.FirstOrDefault(a => a.Id == abonoId)
+            ?? throw DomnaException.NotFound("Pago no encontrado.");
+        abono.Rechazar(por, hoy, motivo.Trim());
     }
 
     /// <summary>Liquida: la reserva se vuelve venta (el stock físico se descuenta en el caso de uso).</summary>
@@ -162,8 +247,11 @@ public class Apartado
     {
         if (Estado != EstadoApartado.Activo || VenceEl > hoy)
             return false;
+        if (EnRevision) return false;
         Estado = EstadoApartado.Vencido;
         CerradoEl = VenceEl;
+        // Una compra en línea sin pagar no es un apartado: libera la reserva sin cobrar penalización.
+        if (Modalidad == ModalidadApartado.Compra) return false;
         if (Penalizado) return false;
         Penalizado = true;
         return true;

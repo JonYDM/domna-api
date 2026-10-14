@@ -23,8 +23,10 @@ public class ApartadoRepository : IApartadoRepository
     public Task<List<Apartado>> ListarDeClientaAsync(string clientaId, CancellationToken ct = default) =>
         ConDetalle().Where(a => a.ClientaId == clientaId).OrderByDescending(a => a.Creado).ToListAsync(ct);
 
+    // Las compras en línea por pagar reservan stock pero no son apartados: no cuentan para el límite.
     public Task<int> ContarActivosDeClientaAsync(string clientaId, CancellationToken ct = default) =>
-        _db.Apartados.CountAsync(a => a.ClientaId == clientaId && a.Estado == EstadoApartado.Activo, ct);
+        _db.Apartados.CountAsync(a => a.ClientaId == clientaId && a.Estado == EstadoApartado.Activo
+            && a.Modalidad != ModalidadApartado.Compra, ct);
 
     public Task<List<Apartado>> ListarActivosVencidosAsync(DateTime hoy, CancellationToken ct = default) =>
         ConDetalle().Where(a => a.Estado == EstadoApartado.Activo && a.VenceEl <= hoy).ToListAsync(ct);

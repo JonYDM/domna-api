@@ -112,6 +112,7 @@ public static class EnumMap
     public static string Metodo(MetodoPago valor) => valor.ToString().ToLowerInvariant();
 
     public static string Concepto(ConceptoAbono valor) => valor.ToString().ToLowerInvariant();
+    public static string EstadoPago(EstadoPago valor) => valor.ToString().ToLowerInvariant();
 
     public static MotivoAjuste Motivo(string? valor) => valor?.Trim().ToLowerInvariant() switch
     {

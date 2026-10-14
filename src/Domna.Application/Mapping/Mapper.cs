@@ -98,7 +98,12 @@ public static class Mapper
         a.Monto,
         a.Fecha,
         EnumMap.Metodo(a.Metodo),
-        EnumMap.Concepto(a.Concepto));
+        EnumMap.Concepto(a.Concepto),
+        EnumMap.EstadoPago(a.Estado),
+        a.RevisadoPor,
+        a.RevisadoEl,
+        a.MotivoRechazo,
+        a.TieneComprobante);
 
     public static ApartadoDto ToDto(this Apartado a) => new(
         a.Id,
@@ -117,6 +122,7 @@ public static class Mapper
         EnumMap.EstadoEntrega(a.EstadoEntrega),
         a.Abonos.Select(ab => ab.ToDto()).ToList(),
         a.Pagado,
+        a.PorConfirmar,
         a.Saldo,
         a.Creado,
         a.VenceEl,

@@ -108,3 +108,12 @@ public enum MotivoAjuste
     Devolucion,
     Traspaso
 }
+
+
+/// <summary>Si un pago ya fue verificado por la tienda. Solo los confirmados cuentan como pagado.</summary>
+public enum EstadoPago
+{
+    Pendiente,
+    Confirmado,
+    Rechazado
+}

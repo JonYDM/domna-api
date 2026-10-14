@@ -63,9 +63,10 @@ public class AvisoService : IAvisoService
                     a.CerradoEl.Value, false, a.Id));
             }
 
-            // Abonos que registró la tienda (el anticipo o la compra los hizo ella misma).
+            // Pagos que la tienda ya confirmó (el anticipo o la compra los declaró la clienta y no se avisan aparte).
             foreach (var ab in a.Abonos)
             {
+                if (ab.Estado != EstadoPago.Confirmado) continue;
                 if (ab.Concepto != ConceptoAbono.Abono && ab.Concepto != ConceptoAbono.Liquidacion) continue;
                 if (ab.Fecha > hoy) continue;
                 var esLiquidacion = ab.Concepto == ConceptoAbono.Liquidacion;

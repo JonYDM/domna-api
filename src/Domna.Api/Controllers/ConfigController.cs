@@ -29,4 +29,19 @@ public class ConfigController : ControllerBase
     [Authorize(Roles = "duena")]
     public async Task<ActionResult<ConfigBoutiqueDto>> FijarCatalogoPublico([FromBody] bool publico, CancellationToken ct)
         => Ok(await _config.FijarCatalogoPublicoAsync(publico, ct));
+
+    /// <summary>
+    /// Cuenta para transferencias. Solo con sesión (no va en la config pública): la ve la clienta
+    /// que elige pagar por transferencia.
+    /// </summary>
+    [HttpGet("datos-bancarios")]
+    [Authorize]
+    public async Task<ActionResult<DatosBancariosDto>> DatosBancarios(CancellationToken ct)
+        => Ok(await _config.ObtenerDatosBancariosAsync(ct));
+
+    /// <summary>Captura o cambia la cuenta para transferencias. Solo la dueña.</summary>
+    [HttpPost("datos-bancarios")]
+    [Authorize(Roles = "duena")]
+    public async Task<ActionResult<DatosBancariosDto>> FijarDatosBancarios(DatosBancariosInput input, CancellationToken ct)
+        => Ok(await _config.FijarDatosBancariosAsync(input, ct));
 }

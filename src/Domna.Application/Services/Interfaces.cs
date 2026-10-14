@@ -56,11 +56,28 @@ public interface IApartadoService
     Task<ApartadoDto> ObtenerAsync(string id, CancellationToken ct = default);
     Task<List<ApartadoDto>> ListarDeClientaAsync(string clientaId, CancellationToken ct = default);
 
+    /// <summary>Pedidos con un pago declarado en línea que la tienda aún no confirma. La cajera ve solo los de su sucursal.</summary>
+    Task<List<ApartadoDto>> ListarPorConfirmarAsync(string usuarioId, CancellationToken ct = default);
+
+    /// <summary>La tienda verificó el pago: cuenta como pagado y, si cubre el saldo, liquida y descuenta el stock.</summary>
+    Task<ApartadoDto> ConfirmarPagoAsync(string apartadoId, string abonoId, string usuarioId, CancellationToken ct = default);
+
+    /// <summary>La tienda no encontró el pago. Queda el motivo y el pedido sigue activo hasta que venza.</summary>
+    Task<ApartadoDto> RechazarPagoAsync(string apartadoId, string abonoId, string motivo, string usuarioId, CancellationToken ct = default);
+
     /// <summary>Corte del día de una sucursal: ventas liquidadas y cerradas ese día (hora de México).</summary>
     Task<CorteDiaDto> CorteDiaAsync(string sucursal, CancellationToken ct = default);
 
     /// <summary>Métricas del dashboard de la dueña, opcionalmente filtradas por sucursal.</summary>
     Task<MetricasDto> MetricasAsync(string? sucursal, CancellationToken ct = default);
+}
+
+/// <summary>Comprobantes de transferencia: la clienta los sube; el personal los ve con su PIN.</summary>
+public interface IComprobanteService
+{
+    Task<ComprobanteFirmadoDto> FirmarSubidaAsync(string apartadoId, string contentType, string clientaId, CancellationToken ct = default);
+    Task<ApartadoDto> RegistrarAsync(string apartadoId, string clave, string clientaId, CancellationToken ct = default);
+    Task<ComprobanteVistaDto> VerAsync(string apartadoId, string abonoId, string pin, string usuarioId, CancellationToken ct = default);
 }
 
 /// <summary>Configuración de negocio de la boutique.</summary>
@@ -69,6 +86,10 @@ public interface IConfigService
     Task<ConfigBoutiqueDto> ObtenerAsync(CancellationToken ct = default);
     Task<ConfigBoutiqueDto> FijarSuspendidaAsync(bool suspendida, CancellationToken ct = default);
     Task<ConfigBoutiqueDto> FijarCatalogoPublicoAsync(bool publico, CancellationToken ct = default);
+
+    /// <summary>Cuenta para recibir transferencias. Solo la ve quien tiene sesión (no es parte de la config pública).</summary>
+    Task<DatosBancariosDto> ObtenerDatosBancariosAsync(CancellationToken ct = default);
+    Task<DatosBancariosDto> FijarDatosBancariosAsync(DatosBancariosInput input, CancellationToken ct = default);
 }
 
 /// <summary>Avisos in-app de la clienta: derivados del estado de sus apartados.</summary>

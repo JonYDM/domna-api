@@ -193,7 +193,8 @@ public class ApartadoRepoFake : IApartadoRepository
         => Task.FromResult(_apartados.Where(a => a.ClientaId == clientaId).OrderByDescending(a => a.Creado).ToList());
 
     public Task<int> ContarActivosDeClientaAsync(string clientaId, CancellationToken ct = default)
-        => Task.FromResult(_apartados.Count(a => a.ClientaId == clientaId && a.Estado == EstadoApartado.Activo));
+        => Task.FromResult(_apartados.Count(a => a.ClientaId == clientaId && a.Estado == EstadoApartado.Activo
+            && a.Modalidad != ModalidadApartado.Compra));
 
     public Task<List<Apartado>> ListarActivosVencidosAsync(DateTime hoy, CancellationToken ct = default)
         => Task.FromResult(_apartados.Where(a => a.Estado == EstadoApartado.Activo && a.VenceEl <= hoy).ToList());

@@ -129,7 +129,8 @@ public class ApartadoService : IApartadoService
         var suc = string.IsNullOrEmpty(sucursal) || sucursal == "todas" ? (SucursalId?)null : EnumMap.Sucursal(sucursal);
 
         var apartados = await _apartados.ListarAsync(ct);
-        var activos = apartados.Where(a => a.Estado == EstadoApartado.Activo).ToList();
+        // Una compra en línea sin pagar aún no es un apartado: espera su confirmación en caja.
+        var activos = apartados.Where(a => a.Estado == EstadoApartado.Activo && a.Modalidad != ModalidadApartado.Compra).ToList();
         var liquidados = apartados.Where(a => a.Estado == EstadoApartado.Liquidado).ToList();
         var delMes = liquidados.Where(a => a.CerradoEl is not null && MismoMesMx(a.CerradoEl.Value, hoy)).ToList();
         // Conversión de APARTADOS (las compras de contado no cuentan: siempre se concretan).
@@ -190,7 +191,8 @@ public class ApartadoService : IApartadoService
             .ToList();
 
         var penalizacionesMes = apartados.Count(a =>
-            a.Estado == EstadoApartado.Vencido && a.CerradoEl is not null && MismoMesMx(a.CerradoEl.Value, hoy)) * config.Penalizacion;
+            a.Estado == EstadoApartado.Vencido && a.Modalidad != ModalidadApartado.Compra &&
+            a.CerradoEl is not null && MismoMesMx(a.CerradoEl.Value, hoy)) * config.Penalizacion;
 
         return new MetricasDto(
             activos.Count,
@@ -255,7 +257,7 @@ public class ApartadoService : IApartadoService
         var total = subtotal + penalizacionPendiente;
         var compra = modalidad == ModalidadApartado.Compra;
         var conAnticipo = modalidad == ModalidadApartado.Anticipo;
-        var vigenciaDias = compra ? 0 : conAnticipo ? config.VigenciaConAnticipoDias : config.VigenciaSinAnticipoDias;
+        var vigenciaDias = VigenciaDias(config, modalidad, EnumMap.Canal(input.Canal));
         var requiereTraslado = lineas.Any(l => l.SucursalOrigen != entrega);
         var listoEstimado = requiereTraslado ? SumarDiasHabiles(hoy, config.DiasTraslado) : hoy;
         var anticipo = compra ? total : conAnticipo ? AnticipoDe(total, config.AnticipoPct) : 0;
@@ -267,6 +269,22 @@ public class ApartadoService : IApartadoService
     }
 
     private static decimal AnticipoDe(decimal total, int pct) => Math.Ceiling(total * pct / 100m);
+
+    /// <summary>
+    /// Días de vigencia desde hoy. En línea el pago nace por confirmar, así que todos los pedidos
+    /// tienen la misma ventana corta para pagar (la vigencia completa de un anticipo empieza cuando
+    /// la tienda lo confirma). En mostrador la compra se cobra en el momento.
+    /// </summary>
+    private static int VigenciaDias(ConfigBoutique config, ModalidadApartado modalidad, Canal canal)
+    {
+        if (canal == Canal.Online) return config.VigenciaSinAnticipoDias;
+        return modalidad switch
+        {
+            ModalidadApartado.Compra => 0,
+            ModalidadApartado.Anticipo => config.VigenciaConAnticipoDias,
+            _ => config.VigenciaSinAnticipoDias,
+        };
+    }
 
     private static DateTime SumarDiasHabiles(DateTime d, int n)
     {
@@ -397,6 +415,74 @@ public class ApartadoService : IApartadoService
         return a.ToDto();
     }
 
+    // ── Pagos por confirmar (pedidos en línea) ──
+
+    public async Task<List<ApartadoDto>> ListarPorConfirmarAsync(string usuarioId, CancellationToken ct = default)
+    {
+        var staff = await ObtenerStaffAsync(usuarioId, ct);
+        await ProcesarVencimientosAsync(ct);
+        var lista = await _apartados.ListarAsync(ct);
+        return lista
+            .Where(a => a.Estado == EstadoApartado.Activo && a.TienePagoPendiente)
+            .Where(a => PuedeVerSucursal(staff, a))
+            .OrderBy(a => a.Creado)
+            .Select(a => a.ToDto())
+            .ToList();
+    }
+
+    public async Task<ApartadoDto> ConfirmarPagoAsync(string apartadoId, string abonoId, string usuarioId, CancellationToken ct = default)
+    {
+        var staff = await ObtenerStaffAsync(usuarioId, ct);
+        await ProcesarVencimientosAsync(ct);
+        var a = await ObtenerParaRevisarAsync(apartadoId, staff, ct);
+        var config = await _config.ObtenerAsync(ct);
+
+        a.ConfirmarPago(abonoId, NombreStaff(staff), _reloj.Ahora, config.VigenciaConAnticipoDias);
+
+        if (a.Estado == EstadoApartado.Liquidado)
+        {
+            await DescontarStockFisicoAsync(a, ct);
+            await _productos.GuardarAsync(ct);
+        }
+        await _apartados.GuardarAsync(ct);
+        return a.ToDto();
+    }
+
+    public async Task<ApartadoDto> RechazarPagoAsync(string apartadoId, string abonoId, string motivo, string usuarioId, CancellationToken ct = default)
+    {
+        var staff = await ObtenerStaffAsync(usuarioId, ct);
+        await ProcesarVencimientosAsync(ct);
+        var a = await ObtenerParaRevisarAsync(apartadoId, staff, ct);
+
+        a.RechazarPago(abonoId, NombreStaff(staff), _reloj.Ahora, motivo);
+
+        await _apartados.GuardarAsync(ct);
+        return a.ToDto();
+    }
+
+    private async Task<Apartado> ObtenerParaRevisarAsync(string apartadoId, Clienta staff, CancellationToken ct)
+    {
+        var a = await _apartados.ObtenerPorIdAsync(apartadoId, ct)
+            ?? throw DomnaException.NotFound("Pedido no encontrado.");
+        if (!PuedeVerSucursal(staff, a))
+            throw new DomnaException(403, "Ese pedido es de otra sucursal.");
+        return a;
+    }
+
+    /// <summary>La dueña ve todas las sucursales; la cajera solo los pedidos que se entregan en la suya.</summary>
+    private static bool PuedeVerSucursal(Clienta staff, Apartado a) =>
+        staff.Rol == Rol.Duena || (staff.SucursalCajera is not null && staff.SucursalCajera == a.Entrega);
+
+    private async Task<Clienta> ObtenerStaffAsync(string usuarioId, CancellationToken ct)
+    {
+        var u = await _clientas.ObtenerPorIdAsync(usuarioId, ct);
+        if (u is null || !u.Activo || (u.Rol != Rol.Duena && u.Rol != Rol.Cajera))
+            throw new DomnaException(403, "No tienes permiso para esto.");
+        return u;
+    }
+
+    private static string NombreStaff(Clienta staff) => $"{staff.Nombre} {staff.Apellidos}".Trim();
+
     // ── Vencimientos (se evalúan en cada lectura, igual que el mock) ──
 
     private async Task ProcesarVencimientosAsync(CancellationToken ct)
@@ -510,7 +596,7 @@ public class ApartadoService : IApartadoService
         var total = subtotal + penalizacionPendiente;
         var compra = modalidad == ModalidadApartado.Compra;
         var conAnticipo = modalidad == ModalidadApartado.Anticipo;
-        var vigenciaDias = compra ? 0 : conAnticipo ? config.VigenciaConAnticipoDias : config.VigenciaSinAnticipoDias;
+        var vigenciaDias = VigenciaDias(config, modalidad, EnumMap.Canal(input.Canal));
         var requiereTraslado = lineas.Any(l => l.SucursalOrigen != entrega);
         var listoEstimado = requiereTraslado ? SumarDiasHabiles(hoy, config.DiasTraslado) : hoy;
         var anticipo = compra ? total : conAnticipo ? AnticipoDe(total, config.AnticipoPct) : 0;

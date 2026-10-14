@@ -83,9 +83,31 @@ public class Abono
     public MetodoPago Metodo { get; private set; }
     public ConceptoAbono Concepto { get; private set; }
 
+    /// <summary>
+    /// Un pago que la clienta declara en línea nace <see cref="EstadoPago.Pendiente"/> y no cuenta
+    /// como pagado hasta que la tienda lo confirma. Lo que cobra el personal nace confirmado.
+    /// </summary>
+    public EstadoPago Estado { get; private set; } = EstadoPago.Confirmado;
+
+    /// <summary>Quién confirmó o rechazó el pago (nombre del personal) y cuándo.</summary>
+    public string? RevisadoPor { get; private set; }
+    public DateTime? RevisadoEl { get; private set; }
+    public string? MotivoRechazo { get; private set; }
+
+    /// <summary>
+    /// Llave PRIVADA del comprobante de transferencia en el almacenamiento. Nunca se manda al
+    /// cliente: solo el personal con su PIN obtiene un enlace temporal para verlo.
+    /// </summary>
+    public string? ComprobanteClave { get; private set; }
+
+    public bool TieneComprobante => !string.IsNullOrEmpty(ComprobanteClave);
+
+    internal void AdjuntarComprobante(string clave) => ComprobanteClave = clave;
+
     private Abono() { }
 
-    public Abono(string id, string apartadoId, decimal monto, DateTime fecha, MetodoPago metodo, ConceptoAbono concepto)
+    public Abono(string id, string apartadoId, decimal monto, DateTime fecha, MetodoPago metodo, ConceptoAbono concepto,
+        EstadoPago estado = EstadoPago.Confirmado)
     {
         if (monto <= 0)
             throw DomnaException.BadRequest("El monto debe ser mayor a cero.");
@@ -95,5 +117,25 @@ public class Abono
         Fecha = fecha;
         Metodo = metodo;
         Concepto = concepto;
+        Estado = estado;
+    }
+
+    internal void Confirmar(string por, DateTime cuando)
+    {
+        if (Estado != EstadoPago.Pendiente)
+            throw DomnaException.BadRequest("Ese pago ya fue revisado.");
+        Estado = EstadoPago.Confirmado;
+        RevisadoPor = por;
+        RevisadoEl = cuando;
+    }
+
+    internal void Rechazar(string por, DateTime cuando, string motivo)
+    {
+        if (Estado != EstadoPago.Pendiente)
+            throw DomnaException.BadRequest("Ese pago ya fue revisado.");
+        Estado = EstadoPago.Rechazado;
+        RevisadoPor = por;
+        RevisadoEl = cuando;
+        MotivoRechazo = motivo;
     }
 }
