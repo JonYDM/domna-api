@@ -82,6 +82,29 @@ public partial class Producto
         _colores.Remove(color);
     }
 
+    /// <summary>¿Esta prenda usa (una copia de) el color del catálogo que se llama así?</summary>
+    public bool UsaColor(string nombre) => _colores.Any(c => c.EsDe(nombre));
+
+    /// <summary>¿Esta prenda tiene ese color con un tono distinto al que hoy tiene en el catálogo?</summary>
+    public bool ColorDesactualizado(string nombre, string hexActual) =>
+        _colores.Any(c => c.EsDe(nombre) && c.TonoDistinto(hexActual));
+
+    /// <summary>
+    /// Pone en la copia de esta prenda el color tal como está HOY en el catálogo (nombre, código y
+    /// familia). Las variantes, el stock y las fotos siguen ligados al mismo color: solo cambia cómo se
+    /// ve y cómo se llama. Si la prenda ya tiene OTRO color con el nombre nuevo, no se toca (quedarían
+    /// dos iguales).
+    /// </summary>
+    /// <returns>true si la copia cambió.</returns>
+    public bool ActualizarColor(string nombreAnterior, string nombreNuevo, string hexNuevo, FamiliaColor familiaNueva)
+    {
+        var objetivo = _colores.FirstOrDefault(c => c.EsDe(nombreAnterior));
+        if (objetivo is null) return false;
+        var repetido = _colores.Any(c => !ReferenceEquals(c, objetivo)
+            && string.Equals(c.Nombre, nombreNuevo.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (repetido) return false;
+        return objetivo.Reemplazar(nombreNuevo, hexNuevo, familiaNueva);
+    }
     /// <summary>Tallas únicas de las variantes (en el orden en que se dieron de alta).</summary>
     public IReadOnlyList<string> Tallas => _variantes.Select(v => v.Talla).Distinct().ToList();
 

@@ -96,7 +96,7 @@ public class CategoriaServiceTests
 
 public class ColorServiceTests
 {
-    private ColorService Crear(ColorRepoFake repo) => new(repo);
+    private ColorService Crear(ColorRepoFake repo, ProductoRepoFake? productos = null) => new(repo, productos ?? new ProductoRepoFake());
 
     [Fact]
     public async Task Crear_normaliza_hex_y_calcula_familia()

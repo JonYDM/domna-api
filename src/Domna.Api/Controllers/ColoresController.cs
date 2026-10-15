@@ -28,11 +28,20 @@ public class ColoresController : ControllerBase
     public async Task<ActionResult<ColorCatalogoDto>> Crear(ColorInput input, CancellationToken ct)
         => Ok(await _colores.CrearAsync(input, ct));
 
-    /// <summary>Edita el nombre y/o el hex de un color.</summary>
+    /// <summary>
+    /// Edita el nombre y/o el hex de un color. Con <c>aplicarAPrendas</c> el cambio también llega a las
+    /// prendas que todavía usan el color tal como estaba (cada prenda guarda su propia copia).
+    /// </summary>
     [HttpPut("{id}")]
     [Authorize(Roles = "duena")]
-    public async Task<ActionResult<ColorCatalogoDto>> Editar(string id, ColorInput input, CancellationToken ct)
+    public async Task<ActionResult<ColorEditadoDto>> Editar(string id, ColorInput input, CancellationToken ct)
         => Ok(await _colores.EditarAsync(id, input, ct));
+
+    /// <summary>En cuántas prendas se usa este color (para avisar antes de editarlo).</summary>
+    [HttpGet("{id}/uso")]
+    [Authorize(Roles = "duena")]
+    public async Task<ActionResult<UsoColorDto>> Uso(string id, CancellationToken ct)
+        => Ok(await _colores.UsoAsync(id, ct));
 
     /// <summary>Quita el color del catálogo (las prendas que lo usan conservan su copia).</summary>
     [HttpDelete("{id}")]

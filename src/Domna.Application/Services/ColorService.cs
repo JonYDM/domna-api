@@ -13,8 +13,13 @@ namespace Domna.Application.Services;
 public class ColorService : IColorService
 {
     private readonly IColorRepository _colores;
+    private readonly IProductoRepository _productos;
 
-    public ColorService(IColorRepository colores) => _colores = colores;
+    public ColorService(IColorRepository colores, IProductoRepository productos)
+    {
+        _colores = colores;
+        _productos = productos;
+    }
 
     public async Task<List<ColorCatalogoDto>> ListarAsync(CancellationToken ct = default)
     {
@@ -35,7 +40,7 @@ public class ColorService : IColorService
         return color.ToDto();
     }
 
-    public async Task<ColorCatalogoDto> EditarAsync(string id, ColorInput input, CancellationToken ct = default)
+    public async Task<ColorEditadoDto> EditarAsync(string id, ColorInput input, CancellationToken ct = default)
     {
         var color = await _colores.ObtenerPorIdAsync(id, ct)
             ?? throw DomnaException.NotFound("Color no encontrado.");
@@ -43,9 +48,35 @@ public class ColorService : IColorService
         if (await _colores.ExisteNombreAsync(nombre, id, ct))
             throw DomnaException.Conflict("Ya existe un color con ese nombre.");
 
+        // El nombre de ANTES: con él se reconocen las copias que usan las prendas.
+        var nombreAnterior = color.Nombre;
         color.Actualizar(input.Nombre, input.Hex);
+
+        // Opcional: llevar el color a las prendas que lo usan (se reconocen por nombre). Las prendas
+        // guardan su propia copia, así que sin esto editar el catálogo no las toca. También sirve para
+        // poner al día prendas que ya quedaron desfasadas (se guarda el color igual y se aplica).
+        var actualizadas = 0;
+        if (input.AplicarAPrendas)
+        {
+            var prendas = await _productos.ListarAsync(incluirInactivos: true, ct);
+            foreach (var p in prendas)
+                if (p.ActualizarColor(nombreAnterior, color.Nombre, color.Hex, color.Familia))
+                    actualizadas++;
+            if (actualizadas > 0) await _productos.GuardarAsync(ct);
+        }
+
         await _colores.GuardarAsync(ct);
-        return color.ToDto();
+        return new ColorEditadoDto(color.Id, color.Nombre, color.Hex, EnumMap.Familia(color.Familia), actualizadas);
+    }
+
+    public async Task<UsoColorDto> UsoAsync(string id, CancellationToken ct = default)
+    {
+        var color = await _colores.ObtenerPorIdAsync(id, ct)
+            ?? throw DomnaException.NotFound("Color no encontrado.");
+        var prendas = await _productos.ListarAsync(incluirInactivos: true, ct);
+        return new UsoColorDto(
+            prendas.Count(p => p.UsaColor(color.Nombre)),
+            prendas.Count(p => p.ColorDesactualizado(color.Nombre, color.Hex)));
     }
 
     public async Task EliminarAsync(string id, CancellationToken ct = default)
