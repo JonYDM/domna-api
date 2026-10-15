@@ -10,7 +10,11 @@ public class PersonalServiceTests
     private readonly RelojFijo _reloj = new();
     private readonly HasherFake _hasher = new();
 
-    private PersonalService Crear(ClientaRepoFake repo) => new(repo, _hasher, _reloj);
+    private PersonalService Crear(ClientaRepoFake repo, SesionRepoFake? sesiones = null)
+    {
+        var sesionSvc = new SesionService(sesiones ?? new SesionRepoFake(), _reloj, new CacheSesionFake());
+        return new(repo, _hasher, _reloj, sesionSvc);
+    }
 
     private static Clienta Duena() => Clienta.CrearStaff(
         "u-jessica", "Jessica", "Jesly", "7774602303", "jessica@jeslyboutique.mx",
@@ -127,5 +131,41 @@ public class PersonalServiceTests
 
         var reactivada = await personal.ActivarAsync(cajera.Id);
         Assert.True(reactivada.Activo);
+    }
+
+    [Fact]
+    public async Task ResetPin_revoca_todas_las_sesiones_de_la_cajera()
+    {
+        var repo = new ClientaRepoFake(Duena());
+        var sesiones = new SesionRepoFake();
+        var personal = Crear(repo, sesiones);
+        var cajera = await personal.CrearCajeraAsync(NuevaCajera());
+
+        // La cajera tiene dos sesiones activas.
+        var svc = new SesionService(sesiones, _reloj, new CacheSesionFake());
+        await svc.CrearAsync("s-1", cajera.Id, "A", _reloj.Ahora.AddDays(7));
+        await svc.CrearAsync("s-2", cajera.Id, "B", _reloj.Ahora.AddDays(7));
+
+        await personal.ResetPinAsync(cajera.Id, new ResetPinInput("999999"));
+
+        Assert.Empty(await svc.ListarActivasAsync(cajera.Id, _reloj.Ahora));
+        Assert.All(sesiones.Todas, s => Assert.Equal(MotivosRevocacion.PinCambiado, s.MotivoRevocacion));
+    }
+
+    [Fact]
+    public async Task Desactivar_revoca_todas_las_sesiones_de_la_cajera()
+    {
+        var repo = new ClientaRepoFake(Duena());
+        var sesiones = new SesionRepoFake();
+        var personal = Crear(repo, sesiones);
+        var cajera = await personal.CrearCajeraAsync(NuevaCajera());
+
+        var svc = new SesionService(sesiones, _reloj, new CacheSesionFake());
+        await svc.CrearAsync("s-1", cajera.Id, "A", _reloj.Ahora.AddDays(7));
+
+        await personal.DesactivarAsync(cajera.Id);
+
+        Assert.Empty(await svc.ListarActivasAsync(cajera.Id, _reloj.Ahora));
+        Assert.All(sesiones.Todas, s => Assert.Equal(MotivosRevocacion.Desactivada, s.MotivoRevocacion));
     }
 }

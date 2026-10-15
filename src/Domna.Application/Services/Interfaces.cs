@@ -5,13 +5,13 @@ namespace Domna.Application.Services;
 /// <summary>Casos de uso de autenticación de la clienta.</summary>
 public interface IAuthService
 {
-    Task<SesionDto> RegistrarAsync(RegistroClientaInput input, CancellationToken ct = default);
-    Task<SesionDto> LoginAsync(LoginInput input, CancellationToken ct = default);
+    Task<SesionDto> RegistrarAsync(RegistroClientaInput input, string? userAgent = null, CancellationToken ct = default);
+    Task<SesionDto> LoginAsync(LoginInput input, string? userAgent = null, CancellationToken ct = default);
 
     /// <summary>¿El teléfono ya tiene cuenta? Solo bool, sin revelar nombre (anti-enumeración mínima).</summary>
     Task<bool> ExisteTelefonoAsync(string telefono, CancellationToken ct = default);
     Task<RecuperacionDto> SolicitarRecuperacionAsync(SolicitarRecuperacionInput input, CancellationToken ct = default);
-    Task<SesionDto> ConfirmarRecuperacionAsync(ConfirmarRecuperacionInput input, CancellationToken ct = default);
+    Task<SesionDto> ConfirmarRecuperacionAsync(ConfirmarRecuperacionInput input, string? userAgent = null, CancellationToken ct = default);
 }
 
 /// <summary>Casos de uso del equipo (dueña y cajeras) para el panel de Personal.</summary>

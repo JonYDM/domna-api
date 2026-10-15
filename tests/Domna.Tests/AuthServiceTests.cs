@@ -12,7 +12,11 @@ public class AuthServiceTests
     private readonly JwtFake _jwt = new();
     private readonly CorreoFake _correo = new();
 
-    private AuthService Crear(ClientaRepoFake repo) => new(repo, _hasher, _jwt, _correo, _reloj);
+    private AuthService Crear(ClientaRepoFake repo, SesionRepoFake? sesiones = null)
+    {
+        var sesionSvc = new SesionService(sesiones ?? new SesionRepoFake(), _reloj, new CacheSesionFake());
+        return new(repo, _hasher, _jwt, _correo, _reloj, sesionSvc);
+    }
 
     private static RegistroClientaInput RegistroMaria(string pin = "123456") =>
         new("María", "González", "7771234567", "maria@correo.com", pin);
@@ -67,7 +71,8 @@ public class AuthServiceTests
         var auth = Crear(repo);
         await auth.RegistrarAsync(RegistroMaria());
 
-        var sesion = await auth.LoginAsync(new LoginInput("7771234567", "123456"));
+        // El registro ya dejó una sesión activa; para iniciar en "otro dispositivo" pedimos reemplazo.
+        var sesion = await auth.LoginAsync(new LoginInput("7771234567", "123456", ReemplazarSesion: true));
         Assert.Equal("777 123 4567", sesion.Clienta.Telefono);
     }
 
@@ -111,7 +116,8 @@ public class AuthServiceTests
 
         // El PIN viejo ya no sirve; el nuevo sí.
         await Assert.ThrowsAsync<DomnaException>(() => auth.LoginAsync(new LoginInput("7771234567", "123456")));
-        var sesion = await auth.LoginAsync(new LoginInput("7771234567", "654321"));
+        // Confirmar la recuperación dejó una sesión activa; pedimos reemplazo para el login nuevo.
+        var sesion = await auth.LoginAsync(new LoginInput("7771234567", "654321", ReemplazarSesion: true));
         Assert.Equal("c-", sesion.Clienta.Id[..2]);
     }
 
@@ -211,5 +217,159 @@ public class AuthServiceTests
         var ex = await Assert.ThrowsAsync<DomnaException>(
             () => auth.LoginAsync(new LoginInput("7771004050", "135790")));
         Assert.Equal(401, ex.StatusCode);
+    }
+
+    // ───────────────────────── Sesión única (una sola sesión activa) ─────────────────────────
+
+    [Fact]
+    public async Task Login_sin_sesion_previa_crea_una_sesion()
+    {
+        var repo = new ClientaRepoFake();
+        var sesiones = new SesionRepoFake();
+        var auth = Crear(repo, sesiones);
+        await auth.RegistrarAsync(RegistroMaria()); // registrar también crea sesión
+
+        // Simulamos "otro dispositivo": cerramos la del registro para que el login quede sin previa.
+        var svc = new SesionService(sesiones, _reloj, new CacheSesionFake());
+        await svc.RevocarTodasAsync(sesiones.Todas[0].UsuarioId, MotivosRevocacion.Cerrada, _reloj.Ahora);
+
+        var sesion = await auth.LoginAsync(new LoginInput("7771234567", "123456"));
+
+        Assert.False(string.IsNullOrEmpty(sesion.Token));
+        // Hay exactamente una sesión activa.
+        var activas = await svc.ListarActivasAsync(sesiones.Todas[0].UsuarioId, _reloj.Ahora);
+        Assert.Single(activas);
+    }
+
+    [Fact]
+    public async Task Registrar_crea_sesion_activa()
+    {
+        var repo = new ClientaRepoFake();
+        var sesiones = new SesionRepoFake();
+        var auth = Crear(repo, sesiones);
+
+        await auth.RegistrarAsync(RegistroMaria());
+
+        Assert.Single(sesiones.Todas);
+        Assert.False(sesiones.Todas[0].Revocada);
+    }
+
+    [Fact]
+    public async Task Login_con_sesion_activa_devuelve_409_con_codigo_y_datos()
+    {
+        var repo = new ClientaRepoFake();
+        var sesiones = new SesionRepoFake();
+        var auth = Crear(repo, sesiones);
+        // Registro deja una sesión activa (dispositivo "Android · Chrome").
+        await auth.RegistrarAsync(RegistroMaria(), "Mozilla/5.0 (Linux; Android 13) Chrome/120.0 Mobile Safari/537.36");
+
+        var ex = await Assert.ThrowsAsync<DomnaException>(
+            () => auth.LoginAsync(new LoginInput("7771234567", "123456")));
+
+        Assert.Equal(409, ex.StatusCode);
+        Assert.Equal("sesion_activa", ex.Codigo);
+        Assert.Equal("Ya tienes una sesion abierta en otro dispositivo.", ex.Message);
+        Assert.NotNull(ex.Datos);
+        // Los datos traen dispositivo, creada y ultimaActividad.
+        var tipo = ex.Datos!.GetType();
+        Assert.Equal("Android · Chrome", tipo.GetProperty("dispositivo")!.GetValue(ex.Datos));
+        Assert.NotNull(tipo.GetProperty("creada")!.GetValue(ex.Datos));
+        Assert.NotNull(tipo.GetProperty("ultimaActividad")!.GetValue(ex.Datos));
+        // No se creó una segunda sesión ni se tocó la primera.
+        Assert.Single(sesiones.Todas);
+        Assert.False(sesiones.Todas[0].Revocada);
+    }
+
+    [Fact]
+    public async Task Login_con_reemplazarSesion_revoca_la_otra_y_crea_la_nueva()
+    {
+        var repo = new ClientaRepoFake();
+        var sesiones = new SesionRepoFake();
+        var auth = Crear(repo, sesiones);
+        await auth.RegistrarAsync(RegistroMaria());
+        var usuarioId = sesiones.Todas[0].UsuarioId;
+
+        var sesion = await auth.LoginAsync(new LoginInput("7771234567", "123456", ReemplazarSesion: true));
+
+        Assert.False(string.IsNullOrEmpty(sesion.Token));
+        // La primera quedó revocada con motivo "reemplazada"; hay una sola activa.
+        var svc = new SesionService(sesiones, _reloj, new CacheSesionFake());
+        var activas = await svc.ListarActivasAsync(usuarioId, _reloj.Ahora);
+        Assert.Single(activas);
+        Assert.Contains(sesiones.Todas, s => s.Revocada && s.MotivoRevocacion == MotivosRevocacion.Reemplazada);
+    }
+
+    [Fact]
+    public async Task Login_con_pin_incorrecto_no_revela_sesion_abierta()
+    {
+        var repo = new ClientaRepoFake();
+        var sesiones = new SesionRepoFake();
+        var auth = Crear(repo, sesiones);
+        await auth.RegistrarAsync(RegistroMaria()); // deja una sesión activa
+
+        var ex = await Assert.ThrowsAsync<DomnaException>(
+            () => auth.LoginAsync(new LoginInput("7771234567", "000000")));
+
+        // Debe ser el 401 genérico de siempre, NO el 409 de sesión activa.
+        Assert.Equal(401, ex.StatusCode);
+        Assert.Null(ex.Codigo);
+    }
+
+    [Fact]
+    public async Task Login_con_sesion_expirada_no_bloquea_un_login_nuevo()
+    {
+        // Clienta ya registrada, con UNA sesión previa YA VENCIDA (expira ayer).
+        var clienta = Clienta.Crear("c1", "María", "González", "7771234567", "maria@correo.com",
+            OrigenClienta.Registro, _reloj.Ahora, _hasher.Hash("123456"));
+        var expirada = Sesion.Crear("s-vieja", clienta.Id, "Android · Chrome",
+            _reloj.Ahora.AddDays(-10), _reloj.Ahora.AddDays(-3));
+        var repo = new ClientaRepoFake(clienta);
+        var sesiones = new SesionRepoFake(expirada);
+        var auth = Crear(repo, sesiones);
+
+        // Login sin reemplazar: no debe dar 409 porque la única sesión previa está vencida.
+        var sesion = await auth.LoginAsync(new LoginInput("7771234567", "123456"));
+        Assert.False(string.IsNullOrEmpty(sesion.Token));
+
+        var svc = new SesionService(sesiones, _reloj, new CacheSesionFake());
+        Assert.Single(await svc.ListarActivasAsync(clienta.Id, _reloj.Ahora));
+    }
+
+    [Fact]
+    public async Task Dos_logins_con_reemplazo_en_cadena_dejan_una_sola_activa()
+    {
+        var repo = new ClientaRepoFake();
+        var sesiones = new SesionRepoFake();
+        var auth = Crear(repo, sesiones);
+        await auth.RegistrarAsync(RegistroMaria());
+        var usuarioId = sesiones.Todas[0].UsuarioId;
+
+        await auth.LoginAsync(new LoginInput("7771234567", "123456", ReemplazarSesion: true));
+        await auth.LoginAsync(new LoginInput("7771234567", "123456", ReemplazarSesion: true));
+
+        var svc = new SesionService(sesiones, _reloj, new CacheSesionFake());
+        var activas = await svc.ListarActivasAsync(usuarioId, _reloj.Ahora);
+        Assert.Single(activas);
+        // Hubo 3 sesiones en total (registro + 2 logins), 2 revocadas.
+        Assert.Equal(3, sesiones.Todas.Count);
+        Assert.Equal(2, sesiones.Todas.Count(s => s.Revocada));
+    }
+
+    [Fact]
+    public async Task Recuperacion_confirmar_revoca_todas_las_sesiones()
+    {
+        var repo = new ClientaRepoFake();
+        var sesiones = new SesionRepoFake();
+        var auth = Crear(repo, sesiones);
+        await auth.RegistrarAsync(RegistroMaria());
+        var usuarioId = sesiones.Todas[0].UsuarioId;
+
+        var rec = await auth.SolicitarRecuperacionAsync(new SolicitarRecuperacionInput("maria@correo.com"));
+        await auth.ConfirmarRecuperacionAsync(new ConfirmarRecuperacionInput(rec.Token!, "654321"));
+
+        // Las sesiones previas quedaron revocadas por "pin_cambiado"; la confirmación crea una nueva.
+        Assert.Contains(sesiones.Todas, s => s.Revocada && s.MotivoRevocacion == MotivosRevocacion.PinCambiado);
+        var svc = new SesionService(sesiones, _reloj, new CacheSesionFake());
+        Assert.Single(await svc.ListarActivasAsync(usuarioId, _reloj.Ahora));
     }
 }

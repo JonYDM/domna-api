@@ -574,6 +574,44 @@ namespace Domna.Infrastructure.Persistence.Migrations
                     b.ToTable("Recuperaciones");
                 });
 
+            modelBuilder.Entity("Domna.Domain.Sesion", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Creada")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Dispositivo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Expira")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MotivoRevocacion")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Revocada")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("RevocadaEl")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UltimaActividad")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("Sesiones");
+                });
+
             modelBuilder.Entity("Domna.Domain.Variante", b =>
                 {
                     b.Property<string>("Id")

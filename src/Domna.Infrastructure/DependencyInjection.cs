@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IAvisoRepository, AvisoRepository>();
         services.AddScoped<IMovimientoRepository, MovimientoRepository>();
         services.AddScoped<IIdempotenciaRepository, IdempotenciaRepository>();
+        services.AddScoped<ISesionRepository, SesionRepository>();
 
         services.AddSingleton(jwtOptions);
         services.AddSingleton(correoOptions);
@@ -51,6 +52,9 @@ public static class DependencyInjection
             services.AddScoped<IServicioCorreo, CorreoSimulado>();
 
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<ISesionService, SesionService>();
+        // Caché en memoria para la validación de sesiones por petición (~10 s por sid).
+        services.AddMemoryCache();
         services.AddScoped<IPersonalService, PersonalService>();
         services.AddScoped<IClientasPanelService, ClientasPanelService>();
         services.AddScoped<IApartadoService, ApartadoService>();

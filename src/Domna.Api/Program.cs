@@ -1,11 +1,13 @@
 using System.Text;
 using Domna.Api;
 using Domna.Application.Abstractions;
+using Domna.Application.Services;
 using Domna.Infrastructure;
 using Domna.Infrastructure.Persistence;
 using Domna.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
@@ -37,6 +39,9 @@ var connectionString =
 
 // Capas Application + Infrastructure (Postgres si hay cadena, si no InMemory).
 builder.Services.AgregarDomna(jwtOptions, correoOptions, connectionString, r2Options);
+
+// Caché de validación de sesiones por `sid` (respaldada por IMemoryCache; invalida al revocar).
+builder.Services.AddSingleton<ICacheSesion, Domna.Api.SesionCache>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -79,6 +84,60 @@ builder.Services
             ValidIssuer = jwtOptions.Issuer,
             ValidAudience = jwtOptions.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret))
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            // Tras validar firma y fecha, comprobamos que el `sid` (si lo trae) siga activo. Un token
+            // SIN `sid` (legacy, anterior a este cambio) se acepta tal cual hasta su vencimiento.
+            OnTokenValidated = async ctx =>
+            {
+                var sid = ctx.Principal?.FindFirst("sid")?.Value;
+                if (string.IsNullOrEmpty(sid))
+                    return; // token legacy: sin estado de sesión en el servidor
+
+                var sp = ctx.HttpContext.RequestServices;
+                var sesiones = sp.GetRequiredService<ISesionService>();
+                var cache = sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
+                var ahora = DateTime.UtcNow;
+
+                // Caché de ~10 s por sid para no pegarle a la base en cada petición. Al revocar en la
+                // misma instancia se invalida esta entrada (ver SesionCache).
+                var llave = SesionCache.Llave(sid);
+                if (!cache.TryGetValue(llave, out EstadoSesion estado))
+                {
+                    estado = await sesiones.ValidarAsync(sid, ahora, ctx.HttpContext.RequestAborted);
+                    cache.Set(llave, estado, TimeSpan.FromSeconds(10));
+                }
+
+                if (estado != EstadoSesion.Activa)
+                {
+                    // Guardamos el código en el contexto para que OnChallenge arme el cuerpo correcto.
+                    ctx.HttpContext.Items["sesion_codigo"] = SesionCodigos.De(estado);
+                    ctx.Fail("Sesión no válida.");
+                    return;
+                }
+
+                // Sesión activa: marcamos actividad (como máximo una vez por minuto). No bloqueamos la
+                // petición si falla el toque: es un detalle de telemetría, no de seguridad.
+                try { await sesiones.TocarAsync(sid, ahora, ctx.HttpContext.RequestAborted); }
+                catch { /* ignorar: no debe tumbar la petición */ }
+            },
+
+            // Cuerpo JSON uniforme en los 401 (sin token, token mal firmado, o `sid` revocado/expirado).
+            OnChallenge = async ctx =>
+            {
+                // Evita el comportamiento por defecto (cabecera WWW-Authenticate vacía sin cuerpo).
+                ctx.HandleResponse();
+                var codigo = ctx.HttpContext.Items.TryGetValue("sesion_codigo", out var c) && c is string s
+                    ? s
+                    : "no_autenticado";
+                var mensaje = SesionCodigos.Mensaje(codigo);
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                ctx.Response.ContentType = "application/json";
+                var json = System.Text.Json.JsonSerializer.Serialize(new { mensaje, codigo });
+                await ctx.Response.WriteAsync(json);
+            }
         };
     });
 builder.Services.AddAuthorization();

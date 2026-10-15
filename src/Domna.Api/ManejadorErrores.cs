@@ -26,7 +26,7 @@ public class ManejadorErrores
         }
         catch (DomnaException ex)
         {
-            await Escribir(ctx, ex.StatusCode, ex.Message);
+            await Escribir(ctx, ex.StatusCode, ex.Message, ex.Codigo, ex.Datos);
         }
         catch (Exception ex)
         {
@@ -35,11 +35,19 @@ public class ManejadorErrores
         }
     }
 
-    private static async Task Escribir(HttpContext ctx, int code, string mensaje)
+    private static async Task Escribir(HttpContext ctx, int code, string mensaje, string? codigo = null, object? datos = null)
     {
         ctx.Response.StatusCode = code;
         ctx.Response.ContentType = "application/json";
-        var json = JsonSerializer.Serialize(new { mensaje });
+        // Si no hay código, el cuerpo queda EXACTAMENTE como siempre: { "mensaje": "..." }.
+        // Si lo hay, se agregan "codigo" y (opcionalmente) "datos" en camelCase.
+        object cuerpo = (codigo, datos) switch
+        {
+            (null, _) => new { mensaje },
+            (_, null) => new { mensaje, codigo },
+            _ => new { mensaje, codigo, datos },
+        };
+        var json = JsonSerializer.Serialize(cuerpo);
         await ctx.Response.WriteAsync(json);
     }
 }

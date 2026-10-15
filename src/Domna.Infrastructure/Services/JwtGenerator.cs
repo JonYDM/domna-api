@@ -24,7 +24,7 @@ public class JwtGenerator : IJwtGenerator
 
     public JwtGenerator(JwtOptions opt) => _opt = opt;
 
-    public (string Token, DateTime Expira) Generar(Clienta clienta, Rol rol)
+    public (string Token, DateTime Expira) Generar(Clienta clienta, Rol rol, string sesionId)
     {
         var expira = DateTime.UtcNow.AddMinutes(_opt.MinutosVigencia);
         var clave = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_opt.Secret));
@@ -36,6 +36,8 @@ public class JwtGenerator : IJwtGenerator
             new Claim(ClaimTypes.Role, rol.ToString().ToLowerInvariant()),
             new Claim("telefono", clienta.Telefono),
             new Claim("nombre", clienta.Nombre),
+            // Id de la sesión: se valida en cada petición para forzar "una sola sesión activa".
+            new Claim("sid", sesionId),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
         };
 

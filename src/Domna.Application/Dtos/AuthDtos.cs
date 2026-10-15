@@ -23,8 +23,8 @@ public record RegistroClientaInput(
     string Email,
     string Pin);
 
-/// <summary>Login con teléfono + PIN.</summary>
-public record LoginInput(string Telefono, string Pin);
+/// <summary>Login con teléfono + PIN. `ReemplazarSesion` cierra la sesión abierta en otro dispositivo.</summary>
+public record LoginInput(string Telefono, string Pin, bool ReemplazarSesion = false);
 
 /// <summary>Respuesta de registro/login: el JWT, cuándo expira y la clienta.</summary>
 public record SesionDto(string Token, DateTime Expira, ClientaDto Clienta);

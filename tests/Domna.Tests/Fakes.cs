@@ -16,11 +16,49 @@ public class HasherFake : IPasswordHasher
     public bool Verificar(string valor, string hash) => hash == "h:" + valor;
 }
 
-/// <summary>JWT falso: token predecible.</summary>
+/// <summary>JWT falso: token predecible que incluye el id de sesión.</summary>
 public class JwtFake : IJwtGenerator
 {
-    public (string Token, DateTime Expira) Generar(Clienta clienta, Rol rol)
-        => ($"token-{clienta.Id}-{rol}", DateTime.UtcNow.AddDays(7));
+    public (string Token, DateTime Expira) Generar(Clienta clienta, Rol rol, string sesionId)
+        => ($"token-{clienta.Id}-{rol}-{sesionId}", DateTime.UtcNow.AddDays(7));
+}
+
+/// <summary>Caché de sesiones no-op para pruebas (no hay IMemoryCache). Recuerda las invalidaciones.</summary>
+public class CacheSesionFake : ICacheSesion
+{
+    public List<string> Invalidados { get; } = new();
+    public void Invalidar(string sesionId) => Invalidados.Add(sesionId);
+}
+
+/// <summary>Repositorio de sesiones en memoria.</summary>
+public class SesionRepoFake : ISesionRepository
+{
+    private readonly List<Sesion> _sesiones = new();
+
+    public SesionRepoFake(params Sesion[] iniciales) => _sesiones.AddRange(iniciales);
+
+    /// <summary>Todas las sesiones (para inspección en pruebas).</summary>
+    public IReadOnlyList<Sesion> Todas => _sesiones;
+
+    public Task<Sesion?> ObtenerPorIdAsync(string id, CancellationToken ct = default)
+        => Task.FromResult(_sesiones.FirstOrDefault(s => s.Id == id));
+
+    public Task<List<Sesion>> ListarNoRevocadasDeUsuarioAsync(string usuarioId, CancellationToken ct = default)
+        => Task.FromResult(_sesiones.Where(s => s.UsuarioId == usuarioId && !s.Revocada).ToList());
+
+    public Task AgregarAsync(Sesion sesion, CancellationToken ct = default)
+    {
+        _sesiones.Add(sesion);
+        return Task.CompletedTask;
+    }
+
+    public Task GuardarAsync(CancellationToken ct = default) => Task.CompletedTask;
+
+    public Task<int> LimpiarVencidasAsync(DateTime limite, CancellationToken ct = default)
+    {
+        var n = _sesiones.RemoveAll(s => s.Expira < limite);
+        return Task.FromResult(n);
+    }
 }
 
 /// <summary>Correo que recuerda el último token "enviado".</summary>

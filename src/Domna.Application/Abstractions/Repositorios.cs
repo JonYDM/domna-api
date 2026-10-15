@@ -146,3 +146,24 @@ public interface IIdempotenciaRepository
     /// <summary>Limpieza perezosa: borra registros con más de 24 h (sin job aparte). Devuelve cuántos borró.</summary>
     Task<int> LimpiarVencidosAsync(DateTime limite, CancellationToken ct = default);
 }
+
+
+/// <summary>
+/// Persistencia de las sesiones activas (una tabla propia). Soporta la regla de "una sola sesión
+/// activa por cuenta": listar/crear sesiones y revocarlas (una o todas las de un usuario).
+/// </summary>
+public interface ISesionRepository
+{
+    Task<Sesion?> ObtenerPorIdAsync(string id, CancellationToken ct = default);
+
+    /// <summary>Sesiones NO revocadas de un usuario (puede incluir vencidas; el servicio filtra por fecha).</summary>
+    Task<List<Sesion>> ListarNoRevocadasDeUsuarioAsync(string usuarioId, CancellationToken ct = default);
+
+    Task AgregarAsync(Sesion sesion, CancellationToken ct = default);
+
+    /// <summary>Confirma los cambios pendientes (altas y revocaciones).</summary>
+    Task GuardarAsync(CancellationToken ct = default);
+
+    /// <summary>Limpieza perezosa opcional: borra sesiones vencidas desde hace tiempo. Devuelve cuántas borró.</summary>
+    Task<int> LimpiarVencidasAsync(DateTime limite, CancellationToken ct = default);
+}

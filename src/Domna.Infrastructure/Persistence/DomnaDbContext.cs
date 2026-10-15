@@ -27,6 +27,7 @@ public class DomnaDbContext : DbContext
     public DbSet<AvisoLeido> AvisosLeidos => Set<AvisoLeido>();
     public DbSet<MovimientoInventario> Movimientos => Set<MovimientoInventario>();
     public DbSet<Idempotencia> Idempotencias => Set<Idempotencia>();
+    public DbSet<Sesion> Sesiones => Set<Sesion>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -157,6 +158,13 @@ public class DomnaDbContext : DbContext
             e.HasIndex(x => new { x.UsuarioId, x.Ruta, x.Llave }).IsUnique();
             // Límite razonable al tamaño del cuerpo guardado (lo recorta el servicio antes de llegar aquí).
             e.Property(x => x.Cuerpo).HasMaxLength(16384);
+        });
+
+        b.Entity<Sesion>(e =>
+        {
+            e.HasKey(x => x.Id);
+            // Índice por usuario: listar rápido sus sesiones al aplicar "una sola sesión activa".
+            e.HasIndex(x => x.UsuarioId);
         });
     }
 }

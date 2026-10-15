@@ -9,13 +9,24 @@ public sealed class DomnaException : Exception
 {
     public int StatusCode { get; }
 
-    public DomnaException(int statusCode, string message) : base(message)
+    /// <summary>
+    /// Código corto y estable que el front usa para distinguir el caso (p. ej. "sesion_activa",
+    /// "sesion_reemplazada"). Opcional: si es null, el cuerpo de error queda igual que siempre.
+    /// </summary>
+    public string? Codigo { get; }
+
+    /// <summary>Datos extra para el front (p. ej. el dispositivo de la otra sesión). Opcional.</summary>
+    public object? Datos { get; }
+
+    public DomnaException(int statusCode, string message, string? codigo = null, object? datos = null) : base(message)
     {
         StatusCode = statusCode;
+        Codigo = codigo;
+        Datos = datos;
     }
 
-    public static DomnaException BadRequest(string message) => new(400, message);
-    public static DomnaException Unauthorized(string message) => new(401, message);
-    public static DomnaException NotFound(string message) => new(404, message);
-    public static DomnaException Conflict(string message) => new(409, message);
+    public static DomnaException BadRequest(string message, string? codigo = null, object? datos = null) => new(400, message, codigo, datos);
+    public static DomnaException Unauthorized(string message, string? codigo = null, object? datos = null) => new(401, message, codigo, datos);
+    public static DomnaException NotFound(string message, string? codigo = null, object? datos = null) => new(404, message, codigo, datos);
+    public static DomnaException Conflict(string message, string? codigo = null, object? datos = null) => new(409, message, codigo, datos);
 }

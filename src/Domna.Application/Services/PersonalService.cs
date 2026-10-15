@@ -14,12 +14,14 @@ public class PersonalService : IPersonalService
     private readonly IClientaRepository _clientas;
     private readonly IPasswordHasher _hasher;
     private readonly IReloj _reloj;
+    private readonly ISesionService _sesiones;
 
-    public PersonalService(IClientaRepository clientas, IPasswordHasher hasher, IReloj reloj)
+    public PersonalService(IClientaRepository clientas, IPasswordHasher hasher, IReloj reloj, ISesionService sesiones)
     {
         _clientas = clientas;
         _hasher = hasher;
         _reloj = reloj;
+        _sesiones = sesiones;
     }
 
     public async Task<List<ClientaDto>> ListarAsync(CancellationToken ct = default)
@@ -77,6 +79,8 @@ public class PersonalService : IPersonalService
         var pin = Normalizacion.NormalizarPin(input.Pin);
         cajera.FijarPinHash(_hasher.Hash(pin));
         await _clientas.GuardarAsync(ct);
+        // Cambió el PIN de la cajera: se cierran todas sus sesiones (motivo "pin_cambiado").
+        await _sesiones.RevocarTodasAsync(cajera.Id, MotivosRevocacion.PinCambiado, _reloj.Ahora, ct);
         return cajera.ToDto();
     }
 
@@ -85,6 +89,8 @@ public class PersonalService : IPersonalService
         var cajera = await ObtenerCajeraAsync(id, ct);
         cajera.Desactivar();
         await _clientas.GuardarAsync(ct);
+        // Se bloqueó el acceso: se cierran todas sus sesiones (motivo "desactivada").
+        await _sesiones.RevocarTodasAsync(cajera.Id, MotivosRevocacion.Desactivada, _reloj.Ahora, ct);
         return cajera.ToDto();
     }
 
