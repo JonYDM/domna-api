@@ -85,11 +85,22 @@ public interface IApartadoRepository
     Task<Dictionary<string, Dictionary<string, int>>> ObtenerReservadoPorVariantesAsync(
         IEnumerable<string> varianteIds, CancellationToken ct = default);
 
+    /// <summary>
+    /// Mayor número de folio existente (el "N" de "DOM-NNNN"). Base para el siguiente folio sin
+    /// reutilizar números, aunque haya huecos. 0 si todavía no hay apartados.
+    /// </summary>
+    Task<int> ObtenerMaxFolioAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// ¿La excepción al guardar es una violación del índice único de Folio? (dos pedidos simultáneos
+    /// tomaron el mismo número). Permite reintentar el alta con otro folio sin acoplar el caso de uso
+    /// al proveedor (Npgsql / InMemory).
+    /// </summary>
+    bool EsColisionDeFolio(Exception ex);
+
     Task AgregarAsync(Apartado apartado, CancellationToken ct = default);
     Task GuardarAsync(CancellationToken ct = default);
 }
-
-/// <summary>Persistencia de la configuración de negocio (fila única).</summary>
 public interface IConfigRepository
 {
     Task<ConfigBoutique> ObtenerAsync(CancellationToken ct = default);
@@ -109,4 +120,29 @@ public interface IMovimientoRepository
 {
     Task AgregarAsync(MovimientoInventario movimiento, CancellationToken ct = default);
     Task<List<MovimientoInventario>> ListarDeProductoAsync(string productoId, CancellationToken ct = default);
+}
+
+
+/// <summary>
+/// Persistencia de registros de idempotencia (una tabla propia, apta para varias instancias).
+/// La llave se acota por usuario+ruta mediante el índice único (UsuarioId, Ruta, Llave).
+/// </summary>
+public interface IIdempotenciaRepository
+{
+    Task<Idempotencia?> ObtenerAsync(string usuarioId, string ruta, string llave, CancellationToken ct = default);
+
+    /// <summary>
+    /// Inserta y persiste el registro "en curso". Devuelve true si lo creó; false si otra petición
+    /// con la misma llave ya lo había insertado (choque del índice único: carrera entre instancias).
+    /// </summary>
+    Task<bool> IntentarReservarAsync(Idempotencia registro, CancellationToken ct = default);
+
+    /// <summary>Guarda los cambios (p. ej. al completar un registro ya reservado).</summary>
+    Task GuardarAsync(CancellationToken ct = default);
+
+    /// <summary>Borra el registro "en curso" cuando la operación no fue 2xx (para poder reintentarla).</summary>
+    Task EliminarAsync(Idempotencia registro, CancellationToken ct = default);
+
+    /// <summary>Limpieza perezosa: borra registros con más de 24 h (sin job aparte). Devuelve cuántos borró.</summary>
+    Task<int> LimpiarVencidosAsync(DateTime limite, CancellationToken ct = default);
 }

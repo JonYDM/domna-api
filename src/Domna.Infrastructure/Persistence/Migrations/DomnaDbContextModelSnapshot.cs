@@ -344,6 +344,41 @@ namespace Domna.Infrastructure.Persistence.Migrations
                     b.ToTable("Config");
                 });
 
+            modelBuilder.Entity("Domna.Domain.Idempotencia", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("CodigoEstado")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreadoEl")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Cuerpo")
+                        .HasMaxLength(16384)
+                        .HasColumnType("character varying(16384)");
+
+                    b.Property<string>("Llave")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Ruta")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId", "Ruta", "Llave")
+                        .IsUnique();
+
+                    b.ToTable("Idempotencias");
+                });
+
             modelBuilder.Entity("Domna.Domain.ImagenProducto", b =>
                 {
                     b.Property<int>("Id")

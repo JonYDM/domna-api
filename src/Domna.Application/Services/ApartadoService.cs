@@ -367,7 +367,23 @@ public class ApartadoService : IApartadoService
         if (clienta is not null && clienta.PenalizacionPendiente > 0)
             clienta.AjustarPenalizacion(-clienta.PenalizacionPendiente);
 
-        await _apartados.GuardarAsync(ct);
+        // Dos pedidos simultáneos pueden tomar el mismo folio y chocar con el índice único al guardar.
+        // Reintentamos hasta 3 veces reasignando el folio al mayor existente + 1 (no reutiliza números).
+        var intento = 0;
+        while (true)
+        {
+            try
+            {
+                await _apartados.GuardarAsync(ct);
+                break;
+            }
+            catch (Exception ex) when (_apartados.EsColisionDeFolio(ex) && intento < MaxReintentosFolio)
+            {
+                intento++;
+                var siguiente = await _apartados.ObtenerMaxFolioAsync(ct) + 1;
+                apartado.ReasignarFolio(FormatearFolio(siguiente));
+            }
+        }
         await _productos.GuardarAsync(ct);
         if (clienta is not null) await _clientas.GuardarAsync(ct);
 
@@ -437,9 +453,11 @@ public class ApartadoService : IApartadoService
         var a = await ObtenerParaRevisarAsync(apartadoId, staff, ct);
         var config = await _config.ObtenerAsync(ct);
 
-        a.ConfirmarPago(abonoId, NombreStaff(staff), _reloj.Ahora, config.VigenciaConAnticipoDias);
+        var cambio = a.ConfirmarPago(abonoId, NombreStaff(staff), _reloj.Ahora, config.VigenciaConAnticipoDias);
 
-        if (a.Estado == EstadoApartado.Liquidado)
+        // Solo al confirmar por primera vez (y si quedó liquidado) se descuenta el stock físico.
+        // Un reintento tras perder señal no vuelve a descontarlo.
+        if (cambio && a.Estado == EstadoApartado.Liquidado)
         {
             await DescontarStockFisicoAsync(a, ct);
             await _productos.GuardarAsync(ct);
@@ -627,11 +645,20 @@ public class ApartadoService : IApartadoService
         }
     }
 
+    /// <summary>
+    /// Siguiente folio "DOM-NNNN" a partir del MAYOR existente + 1 (no por conteo: así no reutiliza
+    /// números si hubiera huecos). Ante dos altas simultáneas el índice único puede chocar igual;
+    /// de eso se encarga el reintento en <see cref="CrearAsync"/>.
+    /// </summary>
     private async Task<string> SiguienteFolioAsync(CancellationToken ct)
     {
-        var todos = await _apartados.ListarAsync(ct);
-        return $"DOM-{(todos.Count + 1):D4}";
+        var max = await _apartados.ObtenerMaxFolioAsync(ct);
+        return FormatearFolio(max + 1);
     }
+
+    private static string FormatearFolio(int numero) => $"DOM-{numero:D4}";
+
+    private const int MaxReintentosFolio = 3;
 
     private static string NuevoId(string prefijo) => $"{prefijo}-{Guid.NewGuid():N}"[..14];
 }

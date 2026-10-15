@@ -47,6 +47,7 @@ public class ApartadosController : ControllerBase
     /// <summary>Crea el apartado o, si la modalidad es "compra", la venta directa (POS incluido).</summary>
     [HttpPost]
     [Authorize]
+    [Idempotente]
     public async Task<ActionResult<ApartadoDto>> Crear(CrearApartadoInput input, CancellationToken ct)
     {
         var i = Saneado(input);
@@ -89,18 +90,21 @@ public class ApartadosController : ControllerBase
     /// <summary>Registra un abono cobrado en mostrador; si cubre el saldo, liquida y descuenta el stock físico.</summary>
     [HttpPost("abonos")]
     [Authorize(Roles = "duena,cajera")]
+    [Idempotente]
     public async Task<ActionResult<ApartadoDto>> Abonar(RegistrarAbonoInput input, CancellationToken ct)
         => Ok(await _apartados.AbonarAsync(input, ct));
 
     /// <summary>La tienda verificó el pago declarado en línea: pasa a pagado (y liquida si cubre el saldo).</summary>
     [HttpPost("{id}/abonos/{abonoId}/confirmar")]
     [Authorize(Roles = "duena,cajera")]
+    [Idempotente]
     public async Task<ActionResult<ApartadoDto>> ConfirmarPago(string id, string abonoId, CancellationToken ct)
         => Ok(await _apartados.ConfirmarPagoAsync(id, abonoId, MiId, ct));
 
     /// <summary>La tienda no encontró el pago. Queda el motivo; el pedido sigue activo hasta que venza.</summary>
     [HttpPost("{id}/abonos/{abonoId}/rechazar")]
     [Authorize(Roles = "duena,cajera")]
+    [Idempotente]
     public async Task<ActionResult<ApartadoDto>> RechazarPago(string id, string abonoId, RechazarPagoInput input, CancellationToken ct)
         => Ok(await _apartados.RechazarPagoAsync(id, abonoId, input.Motivo, MiId, ct));
 
@@ -113,6 +117,7 @@ public class ApartadosController : ControllerBase
     /// <summary>La clienta registra el comprobante ya subido; el pago queda en revisión.</summary>
     [HttpPost("{id}/comprobante")]
     [Authorize]
+    [Idempotente]
     public async Task<ActionResult<ApartadoDto>> RegistrarComprobante(string id, RegistrarComprobanteInput input, CancellationToken ct)
         => Ok(await _comprobantes.RegistrarAsync(id, input.Clave, MiId, ct));
 

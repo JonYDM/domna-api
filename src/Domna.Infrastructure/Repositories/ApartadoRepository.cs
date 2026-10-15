@@ -68,5 +68,46 @@ public class ApartadoRepository : IApartadoRepository
 
     public Task GuardarAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
 
+    public async Task<int> ObtenerMaxFolioAsync(CancellationToken ct = default)
+    {
+        // Los folios tienen el formato "DOM-NNNN". Traemos solo esa columna y sacamos el mayor N.
+        // El catálogo de una boutique es chico; no vale la pena un SQL específico por proveedor.
+        var folios = await _db.Apartados.Select(a => a.Folio).ToListAsync(ct);
+        return MaxFolio(folios);
+    }
+
+    /// <summary>Extrae el mayor número de una lista de folios "DOM-NNNN" (0 si no hay ninguno válido).</summary>
+    internal static int MaxFolio(IEnumerable<string> folios)
+    {
+        var max = 0;
+        foreach (var f in folios)
+        {
+            if (string.IsNullOrEmpty(f)) continue;
+            var guion = f.LastIndexOf('-');
+            var parte = guion >= 0 ? f[(guion + 1)..] : f;
+            if (int.TryParse(parte, out var n) && n > max) max = n;
+        }
+        return max;
+    }
+
+    public bool EsColisionDeFolio(Exception ex)
+    {
+        // Npgsql: violación de índice único => PostgresException con SqlState 23505, envuelta en
+        // DbUpdateException. InMemory no valida índices únicos, así que allí no ocurre (el caso de
+        // uso lo evita calculando el máximo + 1). Reconocemos la colisión sin acoplarnos a Npgsql.
+        for (Exception? actual = ex; actual is not null; actual = actual.InnerException)
+        {
+            if (actual.GetType().Name == "PostgresException")
+            {
+                var sqlState = actual.GetType().GetProperty("SqlState")?.GetValue(actual) as string;
+                if (sqlState == "23505" &&
+                    (actual.Message.Contains("Folio", StringComparison.OrdinalIgnoreCase) ||
+                     actual.Message.Contains("IX_Apartados_Folio", StringComparison.OrdinalIgnoreCase)))
+                    return true;
+            }
+        }
+        return false;
+    }
+
     private static string EnumMapSucursal(SucursalId s) => s == SucursalId.Temixco ? "temixco" : "azteca";
 }

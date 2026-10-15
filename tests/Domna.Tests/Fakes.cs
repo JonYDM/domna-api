@@ -232,7 +232,48 @@ public class ApartadoRepoFake : IApartadoRepository
         return Task.CompletedTask;
     }
 
-    public Task GuardarAsync(CancellationToken ct = default) => Task.CompletedTask;
+    /// <summary>
+    /// Cuántas veces el próximo GuardarAsync debe simular una colisión del índice único de Folio
+    /// (dos pedidos simultáneos). Cada guardado fallido lo decrementa. Sirve para probar el reintento.
+    /// </summary>
+    public int ColisionesDeFolioPendientes { get; set; }
+
+    /// <summary>Folios con los que se intentó guardar, en orden (para verificar el reintento).</summary>
+    public List<string> FoliosIntentados { get; } = new();
+
+    public Task GuardarAsync(CancellationToken ct = default)
+    {
+        // Registra el folio del último apartado agregado (el que se intenta persistir).
+        var ultimo = _apartados.LastOrDefault();
+        if (ultimo is not null) FoliosIntentados.Add(ultimo.Folio);
+
+        if (ColisionesDeFolioPendientes > 0)
+        {
+            ColisionesDeFolioPendientes--;
+            throw new FolioDuplicadoFake();
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task<int> ObtenerMaxFolioAsync(CancellationToken ct = default)
+    {
+        var max = 0;
+        foreach (var a in _apartados)
+        {
+            var guion = a.Folio.LastIndexOf('-');
+            var parte = guion >= 0 ? a.Folio[(guion + 1)..] : a.Folio;
+            if (int.TryParse(parte, out var n) && n > max) max = n;
+        }
+        return Task.FromResult(max);
+    }
+
+    public bool EsColisionDeFolio(Exception ex) => ex is FolioDuplicadoFake;
+}
+
+/// <summary>Excepción que imita la violación del índice único de Folio en el repositorio fake.</summary>
+public class FolioDuplicadoFake : Exception
+{
+    public FolioDuplicadoFake() : base("Folio duplicado (simulado).") { }
 }
 
 /// <summary>Config en memoria, ya creada con defaults (no simula el "crear si no existe").</summary>
@@ -280,4 +321,45 @@ public class MovimientoRepoFake : IMovimientoRepository
 
     public Task<List<MovimientoInventario>> ListarDeProductoAsync(string productoId, CancellationToken ct = default)
         => Task.FromResult(Todos.Where(m => m.ProductoId == productoId).OrderByDescending(m => m.Fecha).ToList());
+}
+
+
+/// <summary>
+/// Repositorio de idempotencia en memoria. Imita el índice único (UsuarioId, Ruta, Llave):
+/// IntentarReservarAsync devuelve false si ya existe un registro con esa llave acotada.
+/// </summary>
+public class IdempotenciaRepoFake : IIdempotenciaRepository
+{
+    private readonly List<Idempotencia> _registros = new();
+
+    /// <summary>Cuántos registros borró la última limpieza perezosa (para verificarla en pruebas).</summary>
+    public int UltimosLimpiados { get; private set; }
+
+    private static bool Coincide(Idempotencia x, string usuarioId, string ruta, string llave) =>
+        x.UsuarioId == usuarioId && x.Ruta == ruta && x.Llave == llave;
+
+    public Task<Idempotencia?> ObtenerAsync(string usuarioId, string ruta, string llave, CancellationToken ct = default)
+        => Task.FromResult(_registros.FirstOrDefault(x => Coincide(x, usuarioId, ruta, llave)));
+
+    public Task<bool> IntentarReservarAsync(Idempotencia registro, CancellationToken ct = default)
+    {
+        if (_registros.Any(x => Coincide(x, registro.UsuarioId, registro.Ruta, registro.Llave)))
+            return Task.FromResult(false);
+        _registros.Add(registro);
+        return Task.FromResult(true);
+    }
+
+    public Task GuardarAsync(CancellationToken ct = default) => Task.CompletedTask;
+
+    public Task EliminarAsync(Idempotencia registro, CancellationToken ct = default)
+    {
+        _registros.Remove(registro);
+        return Task.CompletedTask;
+    }
+
+    public Task<int> LimpiarVencidosAsync(DateTime limite, CancellationToken ct = default)
+    {
+        UltimosLimpiados = _registros.RemoveAll(x => x.CreadoEl < limite);
+        return Task.FromResult(UltimosLimpiados);
+    }
 }

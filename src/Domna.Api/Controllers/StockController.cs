@@ -17,11 +17,13 @@ public class StockController : ControllerBase
 
     /// <summary>Guarda varios cambios de stock de una prenda (valores absolutos), todo o nada, con motivo.</summary>
     [HttpPost("{productoId}/lote")]
+    [Idempotente]
     public async Task<ActionResult<GuardarStockResultado>> GuardarLote(string productoId, GuardarStockInput input, CancellationToken ct)
         => Ok(await _stock.GuardarLoteAsync(productoId, input, ct));
 
     /// <summary>Mueve piezas disponibles de una sucursal a la otra.</summary>
     [HttpPost("mover")]
+    [Idempotente]
     public async Task<IActionResult> Mover(MoverStockInput input, CancellationToken ct)
     {
         await _stock.MoverAsync(input, ct);

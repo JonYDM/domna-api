@@ -26,6 +26,7 @@ public class DomnaDbContext : DbContext
     public DbSet<ConfigBoutique> Config => Set<ConfigBoutique>();
     public DbSet<AvisoLeido> AvisosLeidos => Set<AvisoLeido>();
     public DbSet<MovimientoInventario> Movimientos => Set<MovimientoInventario>();
+    public DbSet<Idempotencia> Idempotencias => Set<Idempotencia>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -147,6 +148,15 @@ public class DomnaDbContext : DbContext
             e.Property(x => x.Sucursal).HasConversion<string>();
             e.Property(x => x.Motivo).HasConversion<string>();
             e.HasIndex(x => new { x.ProductoId, x.Fecha });
+        });
+
+        b.Entity<Idempotencia>(e =>
+        {
+            e.HasKey(x => x.Id);
+            // La llave se acota por usuario + ruta: misma llave con otra ruta o distinto usuario no choca.
+            e.HasIndex(x => new { x.UsuarioId, x.Ruta, x.Llave }).IsUnique();
+            // Límite razonable al tamaño del cuerpo guardado (lo recorta el servicio antes de llegar aquí).
+            e.Property(x => x.Cuerpo).HasMaxLength(16384);
         });
     }
 }

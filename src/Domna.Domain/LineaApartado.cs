@@ -120,22 +120,36 @@ public class Abono
         Estado = estado;
     }
 
-    internal void Confirmar(string por, DateTime cuando)
+    /// <summary>
+    /// Confirma el pago. Si ya estaba confirmado, no hace nada (la cajera reintentó tras perder
+    /// señal): no se cambia quién lo revisó ni cuándo. Confirmar uno ya rechazado sigue siendo error.
+    /// </summary>
+    /// <returns>true si cambió el estado (de pendiente a confirmado); false si ya estaba confirmado.</returns>
+    internal bool Confirmar(string por, DateTime cuando)
     {
+        if (Estado == EstadoPago.Confirmado) return false;
         if (Estado != EstadoPago.Pendiente)
             throw DomnaException.BadRequest("Ese pago ya fue revisado.");
         Estado = EstadoPago.Confirmado;
         RevisadoPor = por;
         RevisadoEl = cuando;
+        return true;
     }
 
-    internal void Rechazar(string por, DateTime cuando, string motivo)
+    /// <summary>
+    /// Rechaza el pago. Si ya estaba rechazado, no hace nada (reintento tras perder señal): se
+    /// conserva el motivo y quién lo revisó. Rechazar uno ya confirmado sigue siendo error.
+    /// </summary>
+    /// <returns>true si cambió el estado (de pendiente a rechazado); false si ya estaba rechazado.</returns>
+    internal bool Rechazar(string por, DateTime cuando, string motivo)
     {
+        if (Estado == EstadoPago.Rechazado) return false;
         if (Estado != EstadoPago.Pendiente)
             throw DomnaException.BadRequest("Ese pago ya fue revisado.");
         Estado = EstadoPago.Rechazado;
         RevisadoPor = por;
         RevisadoEl = cuando;
         MotivoRechazo = motivo;
+        return true;
     }
 }

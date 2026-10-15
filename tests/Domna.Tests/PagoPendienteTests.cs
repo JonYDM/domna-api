@@ -112,13 +112,50 @@ public class PagoPendienteTests
     }
 
     [Fact]
-    public void Un_pago_no_se_confirma_dos_veces()
+    public void Confirmar_dos_veces_no_duplica_el_pago_ni_cambia_quien_reviso()
     {
         var a = Online(ModalidadApartado.Anticipo, 180m);
         a.ConfirmarPago(a.Abonos[0].Id, "Caja", Hoy, 7);
-        var ex = Assert.Throws<DomnaException>(() => a.ConfirmarPago(a.Abonos[0].Id, "Caja", Hoy, 7));
-        Assert.Equal(400, ex.StatusCode);
+        var revisadoPor = a.Abonos[0].RevisadoPor;
+        var revisadoEl = a.Abonos[0].RevisadoEl;
+
+        // Reintento tras perder señal: no lanza error ni cambia nada.
+        a.ConfirmarPago(a.Abonos[0].Id, "Otra Caja", Hoy.AddDays(1), 7);
+
         Assert.Equal(180m, a.Pagado); // no se duplicó
+        Assert.Equal(EstadoPago.Confirmado, a.Abonos[0].Estado);
+        Assert.Equal(revisadoPor, a.Abonos[0].RevisadoPor); // mismo revisor
+        Assert.Equal(revisadoEl, a.Abonos[0].RevisadoEl);
+    }
+
+    [Fact]
+    public void Confirmar_una_compra_dos_veces_no_la_vuelve_a_liquidar_ni_cambia_el_cierre()
+    {
+        var a = Online(ModalidadApartado.Compra, 600m);
+        var ahora = Hoy.AddHours(5);
+        a.ConfirmarPago(a.Abonos[0].Id, "Caja Temixco", ahora, 7);
+        var cerrado = a.CerradoEl;
+
+        // Reintento: sigue liquidado, mismo cierre, mismo revisor.
+        a.ConfirmarPago(a.Abonos[0].Id, "Otra Caja", Hoy.AddDays(1), 7);
+
+        Assert.Equal(EstadoApartado.Liquidado, a.Estado);
+        Assert.Equal(cerrado, a.CerradoEl);
+        Assert.Equal("Caja Temixco", a.Abonos[0].RevisadoPor);
+    }
+
+    [Fact]
+    public void Rechazar_dos_veces_conserva_el_motivo_original()
+    {
+        var a = Online(ModalidadApartado.Compra, 600m);
+        a.RechazarPago(a.Abonos[0].Id, "Caja", Hoy, "No llegó");
+
+        // Reintento: no lanza error ni cambia el motivo ni el revisor.
+        a.RechazarPago(a.Abonos[0].Id, "Otra Caja", Hoy.AddDays(1), "Otro motivo");
+
+        Assert.Equal(EstadoPago.Rechazado, a.Abonos[0].Estado);
+        Assert.Equal("No llegó", a.Abonos[0].MotivoRechazo);
+        Assert.Equal("Caja", a.Abonos[0].RevisadoPor);
     }
 
     [Fact]

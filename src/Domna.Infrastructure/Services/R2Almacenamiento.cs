@@ -70,6 +70,10 @@ public class R2Almacenamiento : IAlmacenamientoImagenes
         var version = DateTime.UtcNow.Ticks.ToString("x"); // versiona para no pisar fotos anteriores
         var subidas = new List<UrlFirmada>();
 
+        // Las fotos van en rutas versionadas (productos/{id}/{version}/{tamano}.webp): son inmutables.
+        // Firmamos el PUT con esta Cache-Control y la devolvemos para que el front la envíe IGUAL.
+        const string cacheControlInmutable = "public, max-age=31536000, immutable";
+
         foreach (var t in tamanos)
         {
             var key = $"productos/{productoId}/{version}/{t}.webp";
@@ -81,9 +85,12 @@ public class R2Almacenamiento : IAlmacenamientoImagenes
                 Expires = DateTime.UtcNow.AddMinutes(_opt.MinutosVigenciaSubida),
                 ContentType = contentType,
             };
+            // La cabecera queda firmada: si el PUT del front no la manda idéntica, R2 rechaza la firma.
+            req.Headers["Cache-Control"] = cacheControlInmutable;
             var urlSubida = _s3.GetPreSignedURL(req);
             var urlPublica = $"{_opt.UrlPublica.TrimEnd('/')}/{key}";
-            subidas.Add(new UrlFirmada(t, urlSubida, urlPublica));
+            var cabeceras = new Dictionary<string, string> { ["Cache-Control"] = cacheControlInmutable };
+            subidas.Add(new UrlFirmada(t, urlSubida, urlPublica, cabeceras));
         }
 
         return new FirmaSubida(subidas);

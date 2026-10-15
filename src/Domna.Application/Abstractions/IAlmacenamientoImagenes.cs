@@ -1,7 +1,16 @@
 namespace Domna.Application.Abstractions;
 
-/// <summary>Una subida firmada: a dónde hace PUT el front y la URL pública final del objeto.</summary>
-public record UrlFirmada(string Tamano, string UrlSubida, string UrlPublica);
+/// <summary>
+/// Una subida firmada: a dónde hace PUT el front, la URL pública final del objeto y las cabeceras
+/// que el cliente DEBE enviar EXACTAMENTE igual en el PUT (contrato con la firma). Para las fotos de
+/// producto incluye <c>Cache-Control: public, max-age=31536000, immutable</c> (rutas versionadas).
+/// Si la firma no fija cabeceras, el diccionario va vacío.
+/// </summary>
+public record UrlFirmada(
+    string Tamano,
+    string UrlSubida,
+    string UrlPublica,
+    IReadOnlyDictionary<string, string> Cabeceras);
 
 /// <summary>Resultado de firmar la subida de las fotos de un producto.</summary>
 public record FirmaSubida(IReadOnlyList<UrlFirmada> Subidas);

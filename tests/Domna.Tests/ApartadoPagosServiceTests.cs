@@ -219,8 +219,25 @@ public class ApartadoPagosServiceTests
         var ap = await _svc.CrearAsync("c1", Pedido("compra"));
         await _svc.ConfirmarPagoAsync(ap.Id, ap.Abonos[0].Id, CajeraTemixco);
 
-        await Assert.ThrowsAsync<DomnaException>(() => _svc.ConfirmarPagoAsync(ap.Id, ap.Abonos[0].Id, CajeraTemixco));
+        // Reintento tras perder señal: responde 200 con el estado actual, sin volver a descontar.
+        var tras = await _svc.ConfirmarPagoAsync(ap.Id, ap.Abonos[0].Id, CajeraTemixco);
+        Assert.Equal("liquidado", tras.Estado);
+        Assert.Equal(600m, tras.Pagado);
         Assert.Equal(4, Stock(SucursalId.Temixco));
+    }
+
+    [Fact]
+    public async Task Rechazar_dos_veces_responde_200_y_conserva_el_motivo()
+    {
+        await Vestido();
+        var ap = await _svc.CrearAsync("c1", Pedido("compra"));
+        await _svc.RechazarPagoAsync(ap.Id, ap.Abonos[0].Id, "No llegó", CajeraTemixco);
+
+        var tras = await _svc.RechazarPagoAsync(ap.Id, ap.Abonos[0].Id, "Otro motivo", CajeraTemixco);
+        Assert.Equal("activo", tras.Estado);
+        Assert.Equal("rechazado", tras.Abonos[0].Estado);
+        Assert.Equal("No llegó", tras.Abonos[0].MotivoRechazo);
+        Assert.Equal(5, Stock(SucursalId.Temixco));
     }
 
     [Fact]

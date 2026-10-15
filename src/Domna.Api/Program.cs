@@ -41,6 +41,26 @@ builder.Services.AgregarDomna(jwtOptions, correoOptions, connectionString, r2Opt
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
+// Compresión de respuestas (Brotli + Gzip) para JSON. EnableForHttps = true porque detrás del
+// proxy de Railway el tráfico interno puede ir cifrado y aun así queremos comprimir.
+// PRECAUCIÓN BREACH: NO se comprime nada bajo /api/auth/* (ahí viajan tokens); comprimir contenido
+// que mezcla secreto + entrada reflejada abre la puerta a ataques tipo BREACH/CRIME.
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProvider>();
+    options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+    options.MimeTypes = new[]
+    {
+        "application/json",
+        "application/problem+json",
+        "text/json",
+    };
+});
+
+// Filtro reutilizable de idempotencia (se usa con [Idempotente] en los POST sensibles).
+builder.Services.AddScoped<Domna.Api.IdempotenciaFilter>();
+
 // Orígenes del front permitidos por CORS: por env (Cors__Origenes, separados por coma) o localhost.
 var origenes = (builder.Configuration["Cors:Origenes"] ?? "http://localhost:5173,http://127.0.0.1:5173")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -64,8 +84,11 @@ builder.Services
 builder.Services.AddAuthorization();
 
 // CORS para el front (dev local y producción). Orígenes configurables por env.
+// Exponemos ETag (para los GET condicionales del catálogo) e Idempotent-Replay (para que el front
+// sepa que un POST reintentado fue un replay y no un alta nueva).
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
-    p.AllowAnyHeader().AllowAnyMethod().WithOrigins(origenes)));
+    p.AllowAnyHeader().AllowAnyMethod().WithOrigins(origenes)
+     .WithExposedHeaders("ETag", "Idempotent-Replay")));
 
 // Swagger con soporte de Bearer para probar endpoints protegidos.
 builder.Services.AddSwaggerGen(c =>
@@ -135,7 +158,18 @@ app.UseMiddleware<ManejadorErrores>();
 app.UseSwagger();
 app.UseSwaggerUI();
 
+// Compresión: va temprano (envuelve el stream antes de que los controllers escriban), pero DESPUÉS
+// del manejador de errores. BREACH: no comprimimos /api/auth/* (ahí viajan tokens).
+app.UseWhen(
+    ctx => !ctx.Request.Path.StartsWithSegments("/api/auth", StringComparison.OrdinalIgnoreCase),
+    rama => rama.UseResponseCompression());
+
 app.UseCors();
+
+// Política de caché "segura por defecto" para /api: no-store salvo lista blanca, ETag/304 incluido.
+// Va DESPUÉS de CORS (para que las cabeceras CORS ya estén) y ANTES de auth/controllers.
+app.UseMiddleware<CacheHttpMiddleware>();
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

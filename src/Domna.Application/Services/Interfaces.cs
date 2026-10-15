@@ -143,3 +143,15 @@ public interface IColorService
     Task<ColorCatalogoDto> EditarAsync(string id, ColorInput input, CancellationToken ct = default);
     Task EliminarAsync(string id, CancellationToken ct = default);
 }
+
+
+
+/// <summary>
+/// Lógica de idempotencia reutilizable por el filtro de la Api. Expone el inicio (consulta/reserva)
+/// y el cierre (guardar la respuesta 2xx) sin acoplarse a HTTP.
+/// </summary>
+public interface IIdempotenciaService
+{
+    Task<InicioIdempotencia> IniciarAsync(string usuarioId, string ruta, string? llave, CancellationToken ct = default);
+    Task CompletarAsync(string usuarioId, string ruta, string llave, int codigoEstado, string? cuerpo, CancellationToken ct = default);
+}

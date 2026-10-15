@@ -209,6 +209,46 @@ public class ApartadoServiceTests
     }
 
     [Fact]
+    public async Task Ante_una_colision_de_folio_reintenta_y_crea_el_apartado()
+    {
+        await Vestido();
+        // Simula que el primer intento de guardar choca con el índice único (otro pedido tomó el folio).
+        _apartados.ColisionesDeFolioPendientes = 1;
+
+        var ap = await _svc.CrearAsync("c1", Pedido());
+
+        Assert.Equal("activo", ap.Estado);
+        // Hubo dos intentos de guardar: el que chocó y el reintento con el folio recalculado.
+        Assert.Equal(2, _apartados.FoliosIntentados.Count);
+        Assert.Equal("DOM-0001", _apartados.FoliosIntentados[0]); // primer intento
+        Assert.Equal("DOM-0002", _apartados.FoliosIntentados[1]); // reintento con el mayor + 1
+        Assert.Equal("DOM-0002", ap.Folio);
+    }
+
+    [Fact]
+    public async Task El_folio_no_reutiliza_numeros_usa_el_mayor_mas_uno()
+    {
+        await Vestido(temixco: 10, azteca: 10);
+        var a1 = await _svc.CrearAsync("c1", Pedido());
+        var a2 = await _svc.CrearAsync("c1", Pedido());
+        var a3 = await _svc.CrearAsync("c1", Pedido());
+        // Aunque un folio intermedio desapareciera, el siguiente parte del mayor existente + 1.
+        Assert.Equal("DOM-0001", a1.Folio);
+        Assert.Equal("DOM-0002", a2.Folio);
+        Assert.Equal("DOM-0003", a3.Folio);
+    }
+
+    [Fact]
+    public async Task Si_la_colision_de_folio_persiste_tras_los_reintentos_propaga_el_error()
+    {
+        await Vestido();
+        // Más colisiones que reintentos (3): el alta termina fallando en vez de colgarse.
+        _apartados.ColisionesDeFolioPendientes = 10;
+
+        await Assert.ThrowsAsync<FolioDuplicadoFake>(() => _svc.CrearAsync("c1", Pedido()));
+    }
+
+    [Fact]
     public async Task Apartar_reserva_stock_sin_tocar_el_fisico()
     {
         var p = await Vestido(temixco: 5, azteca: 2);

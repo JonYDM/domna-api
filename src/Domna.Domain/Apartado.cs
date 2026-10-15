@@ -51,6 +51,12 @@ public class Apartado
     private Apartado() { }
 
     /// <summary>
+    /// Reasigna el folio al reintentar un alta que chocó con el índice único (dos pedidos a la vez).
+    /// Solo lo usa el caso de uso de creación, antes de que el apartado se persista con éxito.
+    /// </summary>
+    public void ReasignarFolio(string folio) => Folio = folio;
+
+    /// <summary>
     /// Crea el apartado/venta ya cotizado. Si hay anticipo (compra = total, con anticipo = una
     /// parte), se registra como primer abono. Las compras se liquidan de inmediato (venta directa).
     /// </summary>
@@ -194,34 +200,52 @@ public class Apartado
     /// saldo, liquida (la reserva se vuelve venta). Si es el anticipo de un apartado, empieza la
     /// vigencia completa de "con anticipo".
     /// </summary>
-    public void ConfirmarPago(string abonoId, string por, DateTime hoy, int vigenciaConAnticipoDias)
+    /// <summary>
+    /// La tienda verificó un pago declarado en línea: pasa a contar como pagado. Si cubre todo el
+    /// saldo, liquida (la reserva se vuelve venta). Si es el anticipo de un apartado, empieza la
+    /// vigencia completa de "con anticipo".
+    /// Confirmar un pago YA confirmado no vuelve a ejecutar nada (reintento de la cajera tras perder
+    /// señal): devuelve el estado actual sin tocar stock ni quién lo revisó.
+    /// </summary>
+    /// <returns>true si se confirmó por primera vez; false si ya estaba confirmado (reintento).</returns>
+    public bool ConfirmarPago(string abonoId, string por, DateTime hoy, int vigenciaConAnticipoDias)
     {
-        if (Estado != EstadoApartado.Activo)
-            throw DomnaException.BadRequest("El apartado ya no está activo; el pedido regresó a la tienda.");
         var abono = _abonos.FirstOrDefault(a => a.Id == abonoId)
             ?? throw DomnaException.NotFound("Pago no encontrado.");
+        // Reintento idempotente: ya estaba confirmado, no se repite nada.
+        if (abono.Estado == EstadoPago.Confirmado) return false;
+
+        if (Estado != EstadoApartado.Activo)
+            throw DomnaException.BadRequest("El apartado ya no está activo; el pedido regresó a la tienda.");
         abono.Confirmar(por, hoy);
 
         if (Saldo == 0)
         {
             Liquidar(hoy);
-            return;
+            return true;
         }
         if (Modalidad == ModalidadApartado.SinAnticipo)
             Modalidad = ModalidadApartado.Anticipo;
         var nuevaVigencia = hoy.AddDays(vigenciaConAnticipoDias);
         if (nuevaVigencia > VenceEl) VenceEl = nuevaVigencia;
+        return true;
     }
 
-    /// <summary>La tienda no encontró el pago. El pedido sigue activo hasta que venza; la clienta puede volver a intentarlo.</summary>
+    /// <summary>
+    /// La tienda no encontró el pago. El pedido sigue activo hasta que venza; la clienta puede volver
+    /// a intentarlo. Rechazar un pago YA rechazado no repite nada: conserva el motivo original.
+    /// </summary>
     public void RechazarPago(string abonoId, string por, DateTime hoy, string motivo)
     {
+        var abono = _abonos.FirstOrDefault(a => a.Id == abonoId)
+            ?? throw DomnaException.NotFound("Pago no encontrado.");
+        // Reintento idempotente: ya estaba rechazado, se conserva el motivo original.
+        if (abono.Estado == EstadoPago.Rechazado) return;
+
         if (Estado != EstadoApartado.Activo)
             throw DomnaException.BadRequest("El apartado ya no está activo.");
         if (string.IsNullOrWhiteSpace(motivo))
             throw DomnaException.BadRequest("Escribe el motivo del rechazo.");
-        var abono = _abonos.FirstOrDefault(a => a.Id == abonoId)
-            ?? throw DomnaException.NotFound("Pago no encontrado.");
         abono.Rechazar(por, hoy, motivo.Trim());
     }
 
