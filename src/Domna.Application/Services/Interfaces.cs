@@ -6,7 +6,7 @@ namespace Domna.Application.Services;
 public interface IAuthService
 {
     Task<SesionDto> RegistrarAsync(RegistroClientaInput input, string? userAgent = null, CancellationToken ct = default, bool appInstalada = false);
-    Task<SesionDto> LoginAsync(LoginInput input, string? userAgent = null, CancellationToken ct = default, bool appInstalada = false);
+    Task<SesionDto> LoginAsync(LoginInput input, string? userAgent = null, CancellationToken ct = default, bool appInstalada = false, string? ip = null);
 
     /// <summary>¿El teléfono ya tiene cuenta? Solo bool, sin revelar nombre (anti-enumeración mínima).</summary>
     Task<bool> ExisteTelefonoAsync(string telefono, CancellationToken ct = default);

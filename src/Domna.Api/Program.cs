@@ -88,13 +88,18 @@ builder.Services
 
         options.Events = new JwtBearerEvents
         {
-            // Tras validar firma y fecha, comprobamos que el `sid` (si lo trae) siga activo. Un token
-            // SIN `sid` (legacy, anterior a este cambio) se acepta tal cual hasta su vencimiento.
+            // Tras validar firma y fecha, comprobamos que el `sid` siga activo. Un token SIN `sid`
+            // (emitido antes de la sesión única) ya NO se acepta: no está ligado a ninguna sesión del
+            // servidor, así que no se podría cerrar ni reemplazar y seguiría vivo hasta 7 días.
             OnTokenValidated = async ctx =>
             {
                 var sid = ctx.Principal?.FindFirst("sid")?.Value;
                 if (string.IsNullOrEmpty(sid))
-                    return; // token legacy: sin estado de sesión en el servidor
+                {
+                    ctx.HttpContext.Items["sesion_codigo"] = "sesion_expirada"; // el front pide entrar de nuevo
+                    ctx.Fail("Token sin sesión.");
+                    return;
+                }
 
                 var sp = ctx.HttpContext.RequestServices;
                 var sesiones = sp.GetRequiredService<ISesionService>();
@@ -174,7 +179,21 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// Detrás del proxy de Railway, la IP de quien se conecta llega en X-Forwarded-For. Sin esto todas las
+// peticiones parecerían venir del proxy y el límite de intentos del login no distinguiría a nadie.
+// Se toma solo el último valor (el que agrega el proxy de Railway), que un cliente no puede falsear.
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                         | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    o.ForwardLimit = 1;
+    o.KnownNetworks.Clear();
+    o.KnownProxies.Clear();
+});
+
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 app.Logger.LogInformation(
     "Correo: {Modo}",

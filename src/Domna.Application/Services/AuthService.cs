@@ -1,4 +1,5 @@
 using Domna.Application.Abstractions;
+using Domna.Application.Abstractions;
 using Domna.Application.Dtos;
 using Domna.Application.Mapping;
 using Domna.Domain;
@@ -21,6 +22,15 @@ public class AuthService : IAuthService
     private readonly IServicioCorreo _correo;
     private readonly IReloj _reloj;
     private readonly ISesionService _sesiones;
+    private readonly ILimitadorIntentos _limitador;
+
+    // Intentos de PIN: 5 fallos desde el mismo teléfono Y la misma red bloquean 10 min; 12 fallos al
+    // mismo teléfono desde cualquier red bloquean 15 min. Un PIN de 6 dígitos son solo un millón de
+    // combinaciones: sin esto, quien conozca el teléfono podría probarlos todos.
+    private const int MaxFallosPorRed = 5;
+    private const int MaxFallosPorTelefono = 12;
+    private static readonly TimeSpan CastigoPorRed = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan CastigoPorTelefono = TimeSpan.FromMinutes(15);
 
     public AuthService(
         IClientaRepository clientas,
@@ -28,7 +38,8 @@ public class AuthService : IAuthService
         IJwtGenerator jwt,
         IServicioCorreo correo,
         IReloj reloj,
-        ISesionService sesiones)
+        ISesionService sesiones,
+        ILimitadorIntentos limitador)
     {
         _clientas = clientas;
         _hasher = hasher;
@@ -36,6 +47,7 @@ public class AuthService : IAuthService
         _correo = correo;
         _reloj = reloj;
         _sesiones = sesiones;
+        _limitador = limitador;
     }
 
     public async Task<SesionDto> RegistrarAsync(RegistroClientaInput input, string? userAgent = null, CancellationToken ct = default, bool appInstalada = false)
@@ -80,17 +92,37 @@ public class AuthService : IAuthService
         return await SesionAsync(clienta, userAgent, appInstalada, ct);
     }
 
-    public async Task<SesionDto> LoginAsync(LoginInput input, string? userAgent = null, CancellationToken ct = default, bool appInstalada = false)
+    public async Task<SesionDto> LoginAsync(LoginInput input, string? userAgent = null, CancellationToken ct = default, bool appInstalada = false, string? ip = null)
     {
         var telefono = Normalizacion.NormalizarTelefono(input.Telefono);
         var pin = Normalizacion.NormalizarPin(input.Pin);
+
+        // Bloqueo ANTES de verificar: mientras está bloqueado ni siquiera el PIN correcto entra, o el
+        // bloqueo no frenaría a quien sigue probando. Cuenta igual si el teléfono no existe (así no
+        // se puede averiguar qué teléfonos tienen cuenta por la diferencia de comportamiento).
+        var llaveRed = $"login:{telefono}:{(string.IsNullOrWhiteSpace(ip) ? "-" : ip)}";
+        var llaveTelefono = $"login-tel:{telefono}";
+        var espera = new[] { _limitador.Bloqueo(llaveRed), _limitador.Bloqueo(llaveTelefono) }.Max();
+        if (espera is { } restante)
+            throw new DomnaException(
+                429,
+                $"Demasiados intentos. Vuelve a intentar en {Math.Max(1, (int)Math.Ceiling(restante.TotalMinutes))} min.",
+                codigo: "demasiados_intentos");
 
         var clienta = await _clientas.ObtenerPorTelefonoAsync(telefono, ct);
         // Mensaje genérico: no filtrar qué dato falló (ni si la cuenta está desactivada).
         // IMPORTANTE: validamos las credenciales ANTES de mirar si hay otra sesión abierta, para no
         // revelar (con un 409) que ese teléfono tiene cuenta cuando el PIN es incorrecto.
         if (clienta is null || !clienta.TieneAcceso || !clienta.Activo || !_hasher.Verificar(pin, clienta.PinHash!))
+        {
+            _limitador.RegistrarFallo(llaveRed, MaxFallosPorRed, CastigoPorRed);
+            _limitador.RegistrarFallo(llaveTelefono, MaxFallosPorTelefono, CastigoPorTelefono);
             throw DomnaException.Unauthorized("Teléfono o PIN incorrecto.");
+        }
+
+        // Credenciales correctas: se borra el historial de fallos de este teléfono.
+        _limitador.Reiniciar(llaveRed);
+        _limitador.Reiniciar(llaveTelefono);
 
         // Credenciales válidas. ¿Hay otra sesión activa en otro dispositivo?
         var activas = await _sesiones.ListarActivasAsync(clienta.Id, _reloj.Ahora, ct);

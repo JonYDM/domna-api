@@ -15,7 +15,7 @@ public class AuthServiceTests
     private AuthService Crear(ClientaRepoFake repo, SesionRepoFake? sesiones = null)
     {
         var sesionSvc = new SesionService(sesiones ?? new SesionRepoFake(), _reloj, new CacheSesionFake());
-        return new(repo, _hasher, _jwt, _correo, _reloj, sesionSvc);
+        return new(repo, _hasher, _jwt, _correo, _reloj, sesionSvc, new LimitadorIntentos(_reloj));
     }
 
     private static RegistroClientaInput RegistroMaria(string pin = "123456") =>

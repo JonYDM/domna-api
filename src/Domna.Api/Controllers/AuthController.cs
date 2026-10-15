@@ -33,7 +33,7 @@ public class AuthController : ControllerBase
     /// <summary>Login con teléfono + PIN. Devuelve la sesión (JWT + clienta).</summary>
     [HttpPost("login")]
     public async Task<ActionResult<SesionDto>> Login(LoginInput input, CancellationToken ct)
-        => Ok(await _auth.LoginAsync(input, Request.Headers.UserAgent.ToString(), ct, AppInstalada));
+        => Ok(await _auth.LoginAsync(input, Request.Headers.UserAgent.ToString(), ct, AppInstalada, HttpContext.Connection.RemoteIpAddress?.ToString()));
 
     /// <summary>
     /// ¿El teléfono ya tiene cuenta? Devuelve solo { existe }. No revela el nombre ni ningún dato

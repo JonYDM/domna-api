@@ -38,7 +38,7 @@ public class LimitadorIntentos : ILimitadorIntentos
         }
     }
 
-    public int RegistrarFallo(string clave)
+    public int RegistrarFallo(string clave, int maxFallos = MaxFallos, TimeSpan? castigo = null)
     {
         lock (_candado)
         {
@@ -49,12 +49,12 @@ public class LimitadorIntentos : ILimitadorIntentos
                 _registros[clave] = r;
             }
             r.Fallos++;
-            if (r.Fallos >= MaxFallos)
+            if (r.Fallos >= maxFallos)
             {
-                r.BloqueadoHasta = ahora + Castigo;
+                r.BloqueadoHasta = ahora + (castigo ?? Castigo);
                 return 0;
             }
-            return MaxFallos - r.Fallos;
+            return maxFallos - r.Fallos;
         }
     }
 

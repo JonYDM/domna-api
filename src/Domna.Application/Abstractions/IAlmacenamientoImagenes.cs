@@ -57,7 +57,7 @@ public interface ILimitadorIntentos
     TimeSpan? Bloqueo(string clave);
 
     /// <summary>Anota un fallo. Devuelve cuántos intentos quedan antes del bloqueo (0 = ya bloqueado).</summary>
-    int RegistrarFallo(string clave);
+    int RegistrarFallo(string clave, int maxFallos = 5, TimeSpan? castigo = null);
 
     /// <summary>Borra el historial de fallos (tras un acierto).</summary>
     void Reiniciar(string clave);
