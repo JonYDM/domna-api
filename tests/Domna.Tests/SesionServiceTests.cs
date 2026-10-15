@@ -187,6 +187,29 @@ public class DescripcionDispositivoTests
         Assert.Equal("Otro dispositivo", DescripcionDispositivo.De("   "));
     }
 
+    [Theory]
+    [InlineData("Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1", "iPhone · App instalada")]
+    [InlineData("Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36", "Android · App instalada")]
+    [InlineData("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0", "Windows · App instalada")]
+    public void De_distingue_la_app_instalada_del_navegador(string ua, string esperado)
+    {
+        Assert.Equal(esperado, DescripcionDispositivo.De(ua, appInstalada: true));
+    }
+
+    [Fact]
+    public void Safari_y_app_instalada_del_mismo_iPhone_se_describen_distinto()
+    {
+        const string ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1";
+        Assert.NotEqual(DescripcionDispositivo.De(ua, appInstalada: false), DescripcionDispositivo.De(ua, appInstalada: true));
+    }
+
+    [Fact]
+    public void Sin_user_agent_la_app_instalada_aun_se_nombra()
+    {
+        Assert.Equal("App instalada", DescripcionDispositivo.De(null, appInstalada: true));
+        Assert.Equal("Otro dispositivo", DescripcionDispositivo.De(null, appInstalada: false));
+    }
+
     [Fact]
     public void De_nulo_devuelve_otro_dispositivo()
     {

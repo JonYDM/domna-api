@@ -10,14 +10,19 @@ namespace Domna.Domain;
 /// </summary>
 public static class DescripcionDispositivo
 {
-    public static string De(string? userAgent)
+    /// <param name="appInstalada">
+    /// true si el front se abrió como app instalada (pantalla de inicio / modo standalone). En un
+    /// teléfono, Safari y la app instalada no comparten sesión: sin esto ambas dirían "iPhone · Safari"
+    /// y la persona vería un aviso de "otra sesión" que parece ser ella misma.
+    /// </param>
+    public static string De(string? userAgent, bool appInstalada = false)
     {
         if (string.IsNullOrWhiteSpace(userAgent))
-            return "Otro dispositivo";
+            return appInstalada ? "App instalada" : "Otro dispositivo";
 
         var ua = userAgent;
         var so = DetectarSo(ua);
-        var navegador = DetectarNavegador(ua);
+        var navegador = appInstalada ? "App instalada" : DetectarNavegador(ua);
 
         if (so is null && navegador is null) return "Otro dispositivo";
         if (so is null) return navegador!;

@@ -38,7 +38,7 @@ public class AuthService : IAuthService
         _sesiones = sesiones;
     }
 
-    public async Task<SesionDto> RegistrarAsync(RegistroClientaInput input, string? userAgent = null, CancellationToken ct = default)
+    public async Task<SesionDto> RegistrarAsync(RegistroClientaInput input, string? userAgent = null, CancellationToken ct = default, bool appInstalada = false)
     {
         // Normaliza/valida con las reglas de dominio antes de tocar la base.
         var telefono = Normalizacion.NormalizarTelefono(input.Telefono);
@@ -57,7 +57,7 @@ public class AuthService : IAuthService
 
             existentePorTel.ReclamarComoRegistro(input.Nombre, input.Apellidos, email, pinHash, _reloj.Ahora);
             await _clientas.GuardarAsync(ct);
-            return await SesionAsync(existentePorTel, userAgent, ct);
+            return await SesionAsync(existentePorTel, userAgent, appInstalada, ct);
         }
 
         if (existentePorTel is not null)
@@ -77,10 +77,10 @@ public class AuthService : IAuthService
 
         await _clientas.AgregarAsync(clienta, ct);
         await _clientas.GuardarAsync(ct);
-        return await SesionAsync(clienta, userAgent, ct);
+        return await SesionAsync(clienta, userAgent, appInstalada, ct);
     }
 
-    public async Task<SesionDto> LoginAsync(LoginInput input, string? userAgent = null, CancellationToken ct = default)
+    public async Task<SesionDto> LoginAsync(LoginInput input, string? userAgent = null, CancellationToken ct = default, bool appInstalada = false)
     {
         var telefono = Normalizacion.NormalizarTelefono(input.Telefono);
         var pin = Normalizacion.NormalizarPin(input.Pin);
@@ -116,7 +116,7 @@ public class AuthService : IAuthService
 
         clienta.RegistrarAcceso(_reloj.Ahora);
         await _clientas.GuardarAsync(ct);
-        return await SesionAsync(clienta, userAgent, ct);
+        return await SesionAsync(clienta, userAgent, appInstalada, ct);
     }
 
     public async Task<bool> ExisteTelefonoAsync(string telefono, CancellationToken ct = default)
@@ -152,7 +152,7 @@ public class AuthService : IAuthService
         return new RecuperacionDto(token);
     }
 
-    public async Task<SesionDto> ConfirmarRecuperacionAsync(ConfirmarRecuperacionInput input, string? userAgent = null, CancellationToken ct = default)
+    public async Task<SesionDto> ConfirmarRecuperacionAsync(ConfirmarRecuperacionInput input, string? userAgent = null, CancellationToken ct = default, bool appInstalada = false)
     {
         var pin = Normalizacion.NormalizarPin(input.Pin);
         var recuperacion = await _clientas.ObtenerRecuperacionAsync((input.Token ?? string.Empty).Trim(), ct);
@@ -170,18 +170,18 @@ public class AuthService : IAuthService
         // Cambió el PIN: todas las sesiones previas dejan de valer (motivo "pin_cambiado").
         await _sesiones.RevocarTodasAsync(clienta.Id, MotivosRevocacion.PinCambiado, _reloj.Ahora, ct);
 
-        return await SesionAsync(clienta, userAgent, ct);
+        return await SesionAsync(clienta, userAgent, appInstalada, ct);
     }
 
     /// <summary>
     /// Emite la sesión: genera el id, el token (que lleva el `sid`) y crea la Sesión persistida con la
     /// Expira del token. Orden: id → token → Sesión.
     /// </summary>
-    private async Task<SesionDto> SesionAsync(Clienta clienta, string? userAgent, CancellationToken ct)
+    private async Task<SesionDto> SesionAsync(Clienta clienta, string? userAgent, bool appInstalada, CancellationToken ct)
     {
         var sesionId = NuevoSesionId();
         var (token, expira) = _jwt.Generar(clienta, clienta.Rol, sesionId);
-        var dispositivo = DescripcionDispositivo.De(userAgent);
+        var dispositivo = DescripcionDispositivo.De(userAgent, appInstalada);
         await _sesiones.CrearAsync(sesionId, clienta.Id, dispositivo, expira, ct);
         return new SesionDto(token, expira, clienta.ToDto());
     }

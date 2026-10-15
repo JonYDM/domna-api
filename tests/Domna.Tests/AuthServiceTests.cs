@@ -255,6 +255,40 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task El_aviso_distingue_la_app_instalada_del_navegador_en_el_mismo_telefono()
+    {
+        const string ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1";
+        var repo = new ClientaRepoFake();
+        var sesiones = new SesionRepoFake();
+        var auth = Crear(repo, sesiones);
+        // Primero entra desde Safari...
+        await auth.RegistrarAsync(RegistroMaria(), ua);
+
+        // ...y luego abre la app instalada en el MISMO iPhone: el aviso debe nombrar a Safari, no repetir a la app.
+        var ex = await Assert.ThrowsAsync<DomnaException>(
+            () => auth.LoginAsync(new LoginInput("7771234567", "123456"), ua, default, appInstalada: true));
+
+        Assert.Equal("sesion_activa", ex.Codigo);
+        Assert.Equal("iPhone · Safari", ex.Datos!.GetType().GetProperty("dispositivo")!.GetValue(ex.Datos));
+    }
+
+    [Fact]
+    public async Task Al_reemplazar_desde_la_app_instalada_la_sesion_nueva_queda_como_app_instalada()
+    {
+        const string ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1";
+        var repo = new ClientaRepoFake();
+        var sesiones = new SesionRepoFake();
+        var auth = Crear(repo, sesiones);
+        await auth.RegistrarAsync(RegistroMaria(), ua);
+
+        await auth.LoginAsync(new LoginInput("7771234567", "123456", true), ua, default, appInstalada: true);
+
+        Assert.Equal("iPhone · App instalada", sesiones.Todas.Single(s => !s.Revocada).Dispositivo);
+        // Y la otra (Safari) quedó cerrada.
+        Assert.Contains(sesiones.Todas, s => s.Revocada && s.Dispositivo == "iPhone · Safari");
+    }
+
+    [Fact]
     public async Task Login_con_sesion_activa_devuelve_409_con_codigo_y_datos()
     {
         var repo = new ClientaRepoFake();

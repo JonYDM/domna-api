@@ -22,15 +22,18 @@ public class AuthController : ControllerBase
         _sesiones = sesiones;
     }
 
+    /// <summary>El front manda `X-Modo-App: instalada` cuando corre como app instalada (no en el navegador).</summary>
+    private bool AppInstalada => string.Equals(Request.Headers["X-Modo-App"].ToString(), "instalada", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Registro propio: nombre, apellidos, teléfono +52, correo y PIN de 6 dígitos. Devuelve la sesión.</summary>
     [HttpPost("registrar")]
     public async Task<ActionResult<SesionDto>> Registrar(RegistroClientaInput input, CancellationToken ct)
-        => Ok(await _auth.RegistrarAsync(input, Request.Headers.UserAgent.ToString(), ct));
+        => Ok(await _auth.RegistrarAsync(input, Request.Headers.UserAgent.ToString(), ct, AppInstalada));
 
     /// <summary>Login con teléfono + PIN. Devuelve la sesión (JWT + clienta).</summary>
     [HttpPost("login")]
     public async Task<ActionResult<SesionDto>> Login(LoginInput input, CancellationToken ct)
-        => Ok(await _auth.LoginAsync(input, Request.Headers.UserAgent.ToString(), ct));
+        => Ok(await _auth.LoginAsync(input, Request.Headers.UserAgent.ToString(), ct, AppInstalada));
 
     /// <summary>
     /// ¿El teléfono ya tiene cuenta? Devuelve solo { existe }. No revela el nombre ni ningún dato
@@ -48,7 +51,7 @@ public class AuthController : ControllerBase
     /// <summary>Confirma la recuperación con el token y fija un PIN nuevo. Devuelve la sesión.</summary>
     [HttpPost("recuperar/confirmar")]
     public async Task<ActionResult<SesionDto>> ConfirmarRecuperacion(ConfirmarRecuperacionInput input, CancellationToken ct)
-        => Ok(await _auth.ConfirmarRecuperacionAsync(input, Request.Headers.UserAgent.ToString(), ct));
+        => Ok(await _auth.ConfirmarRecuperacionAsync(input, Request.Headers.UserAgent.ToString(), ct, AppInstalada));
 
     /// <summary>Cierra la sesión actual en el servidor (revoca su `sid`). Idempotente: siempre 204.</summary>
     [HttpPost("logout")]
