@@ -28,10 +28,7 @@ public class ColoresController : ControllerBase
     public async Task<ActionResult<ColorCatalogoDto>> Crear(ColorInput input, CancellationToken ct)
         => Ok(await _colores.CrearAsync(input, ct));
 
-    /// <summary>
-    /// Edita el nombre y/o el hex de un color. Con <c>aplicarAPrendas</c> el cambio también llega a las
-    /// prendas que todavía usan el color tal como estaba (cada prenda guarda su propia copia).
-    /// </summary>
+    /// <summary>Edita el nombre y/o el hex de un color. El cambio llega también a las prendas que lo usan.</summary>
     [HttpPut("{id}")]
     [Authorize(Roles = "duena")]
     public async Task<ActionResult<ColorEditadoDto>> Editar(string id, ColorInput input, CancellationToken ct)

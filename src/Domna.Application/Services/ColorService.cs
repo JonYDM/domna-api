@@ -52,18 +52,12 @@ public class ColorService : IColorService
         var nombreAnterior = color.Nombre;
         color.Actualizar(input.Nombre, input.Hex);
 
-        // Opcional: llevar el color a las prendas que lo usan (se reconocen por nombre). Las prendas
-        // guardan su propia copia, así que sin esto editar el catálogo no las toca. También sirve para
-        // poner al día prendas que ya quedaron desfasadas (se guarda el color igual y se aplica).
-        var actualizadas = 0;
-        if (input.AplicarAPrendas)
-        {
-            var prendas = await _productos.ListarAsync(incluirInactivos: true, ct);
-            foreach (var p in prendas)
-                if (p.ActualizarColor(nombreAnterior, color.Nombre, color.Hex, color.Familia))
-                    actualizadas++;
-            if (actualizadas > 0) await _productos.GuardarAsync(ct);
-        }
+        // Es EL MISMO color: si cambia en el catálogo, cambia en todas las prendas que lo usan (se
+        // reconocen por el nombre de antes). Cada prenda guarda su propia copia para que borrar un color
+        // del catálogo no la rompa, pero editarlo sí debe verse en todas.
+        var prendas = await _productos.ListarAsync(incluirInactivos: true, ct);
+        var actualizadas = prendas.Count(p => p.ActualizarColor(nombreAnterior, color.Nombre, color.Hex, color.Familia));
+        if (actualizadas > 0) await _productos.GuardarAsync(ct);
 
         await _colores.GuardarAsync(ct);
         return new ColorEditadoDto(color.Id, color.Nombre, color.Hex, EnumMap.Familia(color.Familia), actualizadas);
@@ -74,9 +68,22 @@ public class ColorService : IColorService
         var color = await _colores.ObtenerPorIdAsync(id, ct)
             ?? throw DomnaException.NotFound("Color no encontrado.");
         var prendas = await _productos.ListarAsync(incluirInactivos: true, ct);
-        return new UsoColorDto(
-            prendas.Count(p => p.UsaColor(color.Nombre)),
-            prendas.Count(p => p.ColorDesactualizado(color.Nombre, color.Hex)));
+        return new UsoColorDto(prendas.Count(p => p.UsaColor(color.Nombre)));
+    }
+
+    public async Task<int> SincronizarPrendasAsync(CancellationToken ct = default)
+    {
+        // Pone cada prenda al día con el catálogo. Sirve para las que quedaron desfasadas cuando editar un
+        // color todavía no llegaba a las prendas. Es idempotente: si ya están al día no cambia nada.
+        var catalogo = await _colores.ListarAsync(ct);
+        var prendas = await _productos.ListarAsync(incluirInactivos: true, ct);
+        var cambios = 0;
+        foreach (var p in prendas)
+            foreach (var c in catalogo)
+                if (p.ActualizarColor(c.Nombre, c.Nombre, c.Hex, c.Familia))
+                    cambios++;
+        if (cambios > 0) await _productos.GuardarAsync(ct);
+        return cambios;
     }
 
     public async Task EliminarAsync(string id, CancellationToken ct = default)

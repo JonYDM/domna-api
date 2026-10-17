@@ -85,10 +85,6 @@ public partial class Producto
     /// <summary>¿Esta prenda usa (una copia de) el color del catálogo que se llama así?</summary>
     public bool UsaColor(string nombre) => _colores.Any(c => c.EsDe(nombre));
 
-    /// <summary>¿Esta prenda tiene ese color con un tono distinto al que hoy tiene en el catálogo?</summary>
-    public bool ColorDesactualizado(string nombre, string hexActual) =>
-        _colores.Any(c => c.EsDe(nombre) && c.TonoDistinto(hexActual));
-
     /// <summary>
     /// Pone en la copia de esta prenda el color tal como está HOY en el catálogo (nombre, código y
     /// familia). Las variantes, el stock y las fotos siguen ligados al mismo color: solo cambia cómo se

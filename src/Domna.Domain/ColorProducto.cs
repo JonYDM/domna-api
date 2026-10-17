@@ -28,9 +28,6 @@ public class ColorProducto
     /// </summary>
     public bool EsDe(string nombre) => string.Equals(Nombre, nombre.Trim(), StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>¿Esta copia se ve distinta (tono) a como está hoy el color en el catálogo?</summary>
-    public bool TonoDistinto(string hex) => !string.Equals(Hex, hex.Trim(), StringComparison.OrdinalIgnoreCase);
-
     /// <returns>true si algo cambió.</returns>
     internal bool Reemplazar(string nombre, string hex, FamiliaColor familia)
     {

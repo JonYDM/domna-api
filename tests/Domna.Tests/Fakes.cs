@@ -188,6 +188,9 @@ public class ColorRepoFake : IColorRepository
 {
     private readonly List<ColorCatalogo> _colores = new();
 
+    /// <summary>Los colores guardados, para que las pruebas los inspeccionen o los editen directamente.</summary>
+    public IReadOnlyList<ColorCatalogo> Colores => _colores;
+
     public ColorRepoFake(params ColorCatalogo[] iniciales) => _colores.AddRange(iniciales);
 
     public Task<ColorCatalogo?> ObtenerPorIdAsync(string id, CancellationToken ct = default)

@@ -6,8 +6,9 @@ using Xunit;
 namespace Domna.Tests;
 
 /// <summary>
-/// Editar un color del catálogo y, si se pide, llevar el cambio a las prendas que lo usan. Cada
-/// prenda guarda su PROPIA copia del color, así que sin esto editar el catálogo no las tocaba.
+/// Un color del catálogo y el que usan las prendas es EL MISMO color: si se edita en el catálogo, debe
+/// cambiar en todas las prendas que lo usan. Cada prenda guarda su propia copia (así borrar un color
+/// del catálogo no la rompe), por eso la edición tiene que llevar el cambio a esas copias.
 /// </summary>
 public class ColorAplicarAPrendasTests
 {
@@ -36,26 +37,14 @@ public class ColorAplicarAPrendasTests
 
     private static ColorProducto ColorDe(Producto p, string nombre) => p.Colores.Single(c => c.Nombre == nombre);
 
-    // ── Aplicar a prendas ──
+    // ── Editar el catálogo cambia las prendas ──
 
     [Fact]
-    public async Task Sin_aplicar_las_prendas_no_cambian_aunque_el_catalogo_si()
+    public async Task Editar_el_color_lo_cambia_en_las_prendas_que_lo_usan()
     {
         var corset = await Prenda("p1", ("Verde", "#00FF00"));
 
         var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11"));
-
-        Assert.Equal("#117D11", r.Hex);
-        Assert.Equal(0, r.PrendasActualizadas);
-        Assert.Equal("#00FF00", ColorDe(corset, "Verde").Hex); // la copia de la prenda sigue igual
-    }
-
-    [Fact]
-    public async Task Aplicando_las_prendas_que_lo_usan_toman_el_color_nuevo()
-    {
-        var corset = await Prenda("p1", ("Verde", "#00FF00"));
-
-        var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11", AplicarAPrendas: true));
 
         Assert.Equal(1, r.PrendasActualizadas);
         var color = ColorDe(corset, "Verde");
@@ -70,26 +59,11 @@ public class ColorAplicarAPrendasTests
         var inactiva = await Prenda("p2", ("Verde", "#00FF00"));
         inactiva.Desactivar();
 
-        var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11", true));
+        var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11"));
 
         Assert.Equal(2, r.PrendasActualizadas);
         Assert.Equal("#117D11", ColorDe(activa, "Verde").Hex);
         Assert.Equal("#117D11", ColorDe(inactiva, "Verde").Hex);
-    }
-
-    [Fact]
-    public async Task Pone_al_dia_tambien_las_copias_que_ya_quedaron_con_otro_tono()
-    {
-        // El caso real: el catalogo se edito (sin aplicar) y la prenda quedo con el tono viejo.
-        var corset = await Prenda("p1", ("Verde", "#00FF00"));
-        await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11")); // solo catalogo
-        Assert.Equal("#00FF00", ColorDe(corset, "Verde").Hex);
-
-        // Guardar el MISMO color pidiendo aplicar basta para ponerla al dia.
-        var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11", AplicarAPrendas: true));
-
-        Assert.Equal(1, r.PrendasActualizadas);
-        Assert.Equal("#117D11", ColorDe(corset, "Verde").Hex);
     }
 
     [Fact]
@@ -98,7 +72,7 @@ public class ColorAplicarAPrendasTests
         var verde = await Prenda("p1", ("Verde", "#00FF00"));
         var rojo = await Prenda("p2", ("Rojo", "#FF0000"));
 
-        var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11", true));
+        var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11"));
 
         Assert.Equal(1, r.PrendasActualizadas);
         Assert.Equal("#117D11", ColorDe(verde, "Verde").Hex);
@@ -106,18 +80,10 @@ public class ColorAplicarAPrendasTests
     }
 
     [Fact]
-    public async Task Si_ya_estan_al_dia_no_cuenta_prendas_actualizadas()
-    {
-        await Prenda("p1", ("Verde", "#00FF00"));
-        var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#00FF00", true)); // mismo color
-        Assert.Equal(0, r.PrendasActualizadas);
-    }
-
-    [Fact]
     public async Task Reconoce_la_copia_sin_importar_mayusculas_del_nombre()
     {
         var p = await Prenda("p1", ("VERDE", "#00ff00"));
-        var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11", true));
+        var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11"));
         Assert.Equal(1, r.PrendasActualizadas);
         Assert.Equal("#117D11", ColorDe(p, "Verde").Hex);
     }
@@ -129,7 +95,7 @@ public class ColorAplicarAPrendasTests
         var colorId = ColorDe(p, "Verde").Id;
         var variantesAntes = p.Variantes.Select(v => (v.Id, v.ColorId, v.StockTemixco, v.StockAzteca)).ToList();
 
-        var r = await Svc.EditarAsync("verde", new ColorInput("Verde bosque", "#117D11", true));
+        var r = await Svc.EditarAsync("verde", new ColorInput("Verde bosque", "#117D11"));
 
         Assert.Equal(1, r.PrendasActualizadas);
         var color = Assert.Single(p.Colores);
@@ -143,7 +109,7 @@ public class ColorAplicarAPrendasTests
     {
         var p = await Prenda("p1", ("Verde", "#00FF00"), ("Verde bosque", "#1F4D2E"));
 
-        var r = await Svc.EditarAsync("verde", new ColorInput("Verde bosque", "#117D11", true));
+        var r = await Svc.EditarAsync("verde", new ColorInput("Verde bosque", "#117D11"));
 
         Assert.Equal(0, r.PrendasActualizadas); // quedarían dos colores con el mismo nombre
         Assert.Equal("#00FF00", ColorDe(p, "Verde").Hex);
@@ -153,9 +119,17 @@ public class ColorAplicarAPrendasTests
     [Fact]
     public async Task Sin_prendas_que_lo_usen_no_falla()
     {
-        var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11", true));
+        var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11"));
         Assert.Equal(0, r.PrendasActualizadas);
         Assert.Equal("#117D11", r.Hex);
+    }
+
+    [Fact]
+    public async Task Guardar_el_mismo_color_sin_cambios_no_cuenta_prendas_actualizadas()
+    {
+        await Prenda("p1", ("Verde", "#00FF00"));
+        var r = await Svc.EditarAsync("verde", new ColorInput("Verde", "#00FF00"));
+        Assert.Equal(0, r.PrendasActualizadas);
     }
 
     [Fact]
@@ -164,7 +138,7 @@ public class ColorAplicarAPrendasTests
         await _colores.AgregarAsync(ColorCatalogo.Crear("rojo", "Rojo", "#FF0000"));
         var p = await Prenda("p1", ("Verde", "#00FF00"));
 
-        var ex = await Assert.ThrowsAsync<DomnaException>(() => Svc.EditarAsync("verde", new ColorInput("Rojo", "#117D11", true)));
+        var ex = await Assert.ThrowsAsync<DomnaException>(() => Svc.EditarAsync("verde", new ColorInput("Rojo", "#117D11")));
 
         Assert.Equal(409, ex.StatusCode);
         Assert.Equal("#00FF00", ColorDe(p, "Verde").Hex);
@@ -173,47 +147,30 @@ public class ColorAplicarAPrendasTests
     [Fact]
     public async Task Editar_un_color_inexistente_responde_404()
     {
-        var ex = await Assert.ThrowsAsync<DomnaException>(() => Svc.EditarAsync("nada", new ColorInput("X", "#112233", true)));
+        var ex = await Assert.ThrowsAsync<DomnaException>(() => Svc.EditarAsync("nada", new ColorInput("X", "#112233")));
         Assert.Equal(404, ex.StatusCode);
+    }
+
+    [Fact]
+    public async Task Borrar_un_color_del_catalogo_no_rompe_las_prendas_que_lo_usan()
+    {
+        var p = await Prenda("p1", ("Verde", "#00FF00"));
+        await Svc.EliminarAsync("verde");
+
+        Assert.Equal("#00FF00", ColorDe(p, "Verde").Hex); // conserva su copia
     }
 
     // ── Uso ──
 
     [Fact]
-    public async Task Uso_cuenta_las_prendas_del_color_y_cuantas_lo_muestran_distinto()
+    public async Task Uso_cuenta_las_prendas_activas_o_no_que_usan_el_color()
     {
-        await Prenda("p1", ("Verde", "#00FF00"));                 // al dia
-        var inactiva = await Prenda("p2", ("Verde", "#00FF00"));  // al dia (inactiva tambien cuenta)
+        await Prenda("p1", ("Verde", "#00FF00"));
+        var inactiva = await Prenda("p2", ("Verde", "#00FF00"));
         inactiva.Desactivar();
-        await Prenda("p3", ("Verde", "#123456"));                 // con otro tono
-        await Prenda("p4", ("Rojo", "#FF0000"));                  // de otro color
+        await Prenda("p3", ("Rojo", "#FF0000"));
 
-        var uso = await Svc.UsoAsync("verde");
-
-        Assert.Equal(3, uso.Prendas);
-        Assert.Equal(1, uso.Desactualizadas);
-    }
-
-    [Fact]
-    public async Task Uso_tras_editar_el_catalogo_sin_aplicar_marca_las_prendas_como_desactualizadas()
-    {
-        await Prenda("p1", ("Verde", "#00FF00"));
-        await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11"));
-
-        var uso = await Svc.UsoAsync("verde");
-        Assert.Equal(1, uso.Prendas);
-        Assert.Equal(1, uso.Desactualizadas);
-    }
-
-    [Fact]
-    public async Task Uso_tras_aplicar_deja_todo_al_dia()
-    {
-        await Prenda("p1", ("Verde", "#00FF00"));
-        await Svc.EditarAsync("verde", new ColorInput("Verde", "#117D11", true));
-
-        var uso = await Svc.UsoAsync("verde");
-        Assert.Equal(1, uso.Prendas);
-        Assert.Equal(0, uso.Desactualizadas);
+        Assert.Equal(2, (await Svc.UsoAsync("verde")).Prendas);
     }
 
     [Fact]
@@ -221,5 +178,49 @@ public class ColorAplicarAPrendasTests
     {
         var ex = await Assert.ThrowsAsync<DomnaException>(() => Svc.UsoAsync("nada"));
         Assert.Equal(404, ex.StatusCode);
+    }
+
+    // ── Ponerse al día al arrancar (prendas que ya quedaron con un tono viejo) ──
+
+    [Fact]
+    public async Task Sincronizar_pone_al_dia_las_prendas_que_quedaron_desfasadas()
+    {
+        // Como el Corset real: el catálogo cambió a #117D11 pero la prenda se quedó con #00FF00.
+        var corset = await Prenda("p1", ("Verde", "#00FF00"));
+        var estraple = await Prenda("p2", ("Marfil", "#A7D7C5"));
+        _colores.Colores.Single(c => c.Id == "verde").Actualizar("Verde", "#117D11");
+        await _colores.AgregarAsync(ColorCatalogo.Crear("marfil", "Marfil", "#F5F0E1"));
+
+        var cambios = await Svc.SincronizarPrendasAsync();
+
+        Assert.Equal(2, cambios);
+        Assert.Equal("#117D11", ColorDe(corset, "Verde").Hex);
+        Assert.Equal("#F5F0E1", ColorDe(estraple, "Marfil").Hex);
+        Assert.Equal(FamiliaColor.Blanco, ColorDe(estraple, "Marfil").Familia);
+    }
+
+    [Fact]
+    public async Task Sincronizar_es_idempotente_la_segunda_vez_no_cambia_nada()
+    {
+        await Prenda("p1", ("Verde", "#00FF00"));
+        _colores.Colores.Single(c => c.Id == "verde").Actualizar("Verde", "#117D11");
+
+        Assert.Equal(1, await Svc.SincronizarPrendasAsync());
+        Assert.Equal(0, await Svc.SincronizarPrendasAsync());
+    }
+
+    [Fact]
+    public async Task Sincronizar_no_toca_colores_que_ya_no_estan_en_el_catalogo()
+    {
+        var p = await Prenda("p1", ("Coral antiguo", "#FF7F6B"));
+
+        Assert.Equal(0, await Svc.SincronizarPrendasAsync());
+        Assert.Equal("#FF7F6B", ColorDe(p, "Coral antiguo").Hex);
+    }
+
+    [Fact]
+    public async Task Sincronizar_sin_prendas_ni_colores_no_falla()
+    {
+        Assert.Equal(0, await Svc.SincronizarPrendasAsync());
     }
 }

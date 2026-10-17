@@ -228,6 +228,18 @@ using (var scope = app.Services.CreateScope())
         }
     }
     Seed.Sembrar(db, hasher);
+
+    // Prendas que quedaron con un tono viejo de un color (antes editar el catálogo no las alcanzaba):
+    // se ponen al día una vez. Es idempotente y, si fallara, no debe impedir que la API arranque.
+    try
+    {
+        var cambios = scope.ServiceProvider.GetRequiredService<IColorService>().SincronizarPrendasAsync().GetAwaiter().GetResult();
+        if (cambios > 0) app.Logger.LogInformation("Colores de prendas puestos al día: {Cambios}.", cambios);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "No se pudieron poner al día los colores de las prendas.");
+    }
 }
 
 app.UseMiddleware<ManejadorErrores>();

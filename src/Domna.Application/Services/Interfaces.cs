@@ -142,8 +142,11 @@ public interface IColorService
     Task<ColorCatalogoDto> CrearAsync(ColorInput input, CancellationToken ct = default);
     Task<ColorEditadoDto> EditarAsync(string id, ColorInput input, CancellationToken ct = default);
 
-    /// <summary>En cuántas prendas (activas o no) se usa el color tal como está en el catálogo.</summary>
+    /// <summary>En cuántas prendas (activas o no) se usa el color.</summary>
     Task<UsoColorDto> UsoAsync(string id, CancellationToken ct = default);
+
+    /// <summary>Pone todas las prendas al día con los colores del catálogo. Devuelve cuántas copias cambiaron.</summary>
+    Task<int> SincronizarPrendasAsync(CancellationToken ct = default);
     Task EliminarAsync(string id, CancellationToken ct = default);
 }
 
