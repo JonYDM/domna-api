@@ -28,6 +28,9 @@ public interface IProductoRepository
 {
     Task<Producto?> ObtenerPorIdAsync(string id, CancellationToken ct = default);
     Task<List<Producto>> ListarAsync(bool incluirInactivos, CancellationToken ct = default);
+
+    /// <summary>Prendas por id (activas o no) con sus colores y fotos, sin variantes: para mostrar la foto de un pedido.</summary>
+    Task<List<Producto>> ListarFotosAsync(IReadOnlyCollection<string> ids, CancellationToken ct = default);
     Task<Producto?> BuscarPorCodigoBarrasAsync(string codigo, CancellationToken ct = default);
 
     /// <summary>El producto que contiene una variante (con colores, variantes e imágenes).</summary>

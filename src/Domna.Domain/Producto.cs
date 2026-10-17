@@ -45,6 +45,18 @@ public partial class Producto
     /// <summary>Cuántas fotos tiene un color.</summary>
     public int FotosDeColor(string colorId) => _imagenes.Count(i => i.ColorId == colorId);
 
+    /// <summary>
+    /// La foto con la que se reconoce esta prenda en una lista: la primera del color pedido (se busca por
+    /// nombre, que es lo que guardan los pedidos) o, si ese color no tiene fotos, la primera de la prenda.
+    /// </summary>
+    public string? FotoPrincipal(string? colorNombre)
+    {
+        var fotos = _imagenes.OrderBy(i => i.Orden).ToList();
+        var color = string.IsNullOrWhiteSpace(colorNombre) ? null : _colores.FirstOrDefault(c => c.EsDe(colorNombre));
+        var delColor = color is null ? null : fotos.FirstOrDefault(i => i.ColorId == color.Id);
+        return (delColor ?? fotos.FirstOrDefault())?.Url;
+    }
+
     /// <summary>Quita UNA foto por su URL. No valida reglas de "última foto" (eso lo decide el caso de uso).</summary>
     public void QuitarImagen(string url)
     {

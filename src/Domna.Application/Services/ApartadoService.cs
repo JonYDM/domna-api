@@ -65,7 +65,7 @@ public class ApartadoService : IApartadoService
             ? filtrada.OrderBy(a => a.VenceEl)
             : filtrada.OrderByDescending(a => a.Creado);
 
-        return filtrada.Select(a => a.ToDto()).ToList();
+        return await MapearAsync(filtrada, ct);
     }
 
     public async Task<ApartadoDto> ObtenerAsync(string id, CancellationToken ct = default)
@@ -73,15 +73,31 @@ public class ApartadoService : IApartadoService
         await ProcesarVencimientosAsync(ct);
         var a = await _apartados.ObtenerPorIdAsync(id, ct)
             ?? throw DomnaException.NotFound("Apartado no encontrado.");
-        return a.ToDto();
+        return await MapearAsync(a, ct);
     }
 
     public async Task<List<ApartadoDto>> ListarDeClientaAsync(string clientaId, CancellationToken ct = default)
     {
         await ProcesarVencimientosAsync(ct);
         var lista = await _apartados.ListarDeClientaAsync(clientaId, ct);
-        return lista.Select(a => a.ToDto()).ToList();
+        return await MapearAsync(lista, ct);
     }
+
+    /// <summary>
+    /// Convierte pedidos a DTO añadiendo la foto de cada prenda. Es UNA consulta por lote (no una por línea),
+    /// y la foto se busca al momento, así que si la dueña cambia la foto de la prenda el pedido la refleja.
+    /// </summary>
+    private async Task<List<ApartadoDto>> MapearAsync(IEnumerable<Apartado> apartados, CancellationToken ct)
+    {
+        var lista = apartados.ToList();
+        var ids = lista.SelectMany(a => a.Lineas).Select(l => l.ProductoId).Distinct().ToList();
+        var prendas = (await _productos.ListarFotosAsync(ids, ct)).ToDictionary(p => p.Id);
+        string? FotoDe(LineaApartado l) => prendas.TryGetValue(l.ProductoId, out var p) ? p.FotoPrincipal(l.ColorNombre) : null;
+        return lista.Select(a => a.ToDto(FotoDe)).ToList();
+    }
+
+    private async Task<ApartadoDto> MapearAsync(Apartado apartado, CancellationToken ct) =>
+        (await MapearAsync(new[] { apartado }, ct))[0];
 
     private static readonly TimeZoneInfo ZonaMx = ObtenerZonaMx();
 
@@ -166,6 +182,7 @@ public class ApartadoService : IApartadoService
 
         // Top productos por unidades vendidas/apartadas.
         var unidades = new Dictionary<string, TopProductoDto>();
+        var colorDeTop = new Dictionary<string, string>();
         foreach (var a in liquidados.Concat(activos))
         {
             foreach (var l in LineasDeSucursal(a))
@@ -173,10 +190,17 @@ public class ApartadoService : IApartadoService
                 if (unidades.TryGetValue(l.ProductoId, out var existente))
                     unidades[l.ProductoId] = existente with { Unidades = existente.Unidades + l.Cantidad };
                 else
+                {
                     unidades[l.ProductoId] = new TopProductoDto(l.ProductoId, l.Nombre, EnumMap.Silueta(l.Silueta), l.ColorHex, l.Cantidad);
+                    colorDeTop[l.ProductoId] = l.ColorNombre;
+                }
             }
         }
         var topProductos = unidades.Values.OrderByDescending(x => x.Unidades).Take(5).ToList();
+        var fotosTop = (await _productos.ListarFotosAsync(topProductos.Select(x => x.ProductoId).ToList(), ct)).ToDictionary(p => p.Id);
+        topProductos = topProductos
+            .Select(x => x with { ImagenUrl = fotosTop.TryGetValue(x.ProductoId, out var prenda) ? prenda.FotoPrincipal(colorDeTop.GetValueOrDefault(x.ProductoId)) : null })
+            .ToList();
 
         // Ventas de los últimos 7 días (incluye hoy).
         var ventasUltimos7 = Enumerable.Range(-6, 7)
@@ -387,7 +411,7 @@ public class ApartadoService : IApartadoService
         await _productos.GuardarAsync(ct);
         if (clienta is not null) await _clientas.GuardarAsync(ct);
 
-        return apartado.ToDto();
+        return await MapearAsync(apartado, ct);
     }
 
     // ── Abonar ──
@@ -408,7 +432,7 @@ public class ApartadoService : IApartadoService
         }
 
         await _apartados.GuardarAsync(ct);
-        return a.ToDto();
+        return await MapearAsync(a, ct);
     }
 
     // ── Cancelar / avanzar entrega ──
@@ -419,7 +443,7 @@ public class ApartadoService : IApartadoService
             ?? throw DomnaException.NotFound("Apartado no encontrado.");
         a.Cancelar(_reloj.Ahora);
         await _apartados.GuardarAsync(ct);
-        return a.ToDto();
+        return await MapearAsync(a, ct);
     }
 
     public async Task<ApartadoDto> AvanzarEntregaAsync(string id, string siguiente, CancellationToken ct = default)
@@ -428,7 +452,7 @@ public class ApartadoService : IApartadoService
             ?? throw DomnaException.NotFound("Apartado no encontrado.");
         a.AvanzarEntrega(EnumMap.EstadoEntrega(siguiente));
         await _apartados.GuardarAsync(ct);
-        return a.ToDto();
+        return await MapearAsync(a, ct);
     }
 
     // ── Pagos por confirmar (pedidos en línea) ──
@@ -438,12 +462,12 @@ public class ApartadoService : IApartadoService
         var staff = await ObtenerStaffAsync(usuarioId, ct);
         await ProcesarVencimientosAsync(ct);
         var lista = await _apartados.ListarAsync(ct);
-        return lista
+        var porConfirmar = lista
             .Where(a => a.Estado == EstadoApartado.Activo && a.TienePagoPendiente)
             .Where(a => PuedeVerSucursal(staff, a))
             .OrderBy(a => a.Creado)
-            .Select(a => a.ToDto())
             .ToList();
+        return await MapearAsync(porConfirmar, ct);
     }
 
     public async Task<ApartadoDto> ConfirmarPagoAsync(string apartadoId, string abonoId, string usuarioId, CancellationToken ct = default)
@@ -463,7 +487,7 @@ public class ApartadoService : IApartadoService
             await _productos.GuardarAsync(ct);
         }
         await _apartados.GuardarAsync(ct);
-        return a.ToDto();
+        return await MapearAsync(a, ct);
     }
 
     public async Task<ApartadoDto> RechazarPagoAsync(string apartadoId, string abonoId, string motivo, string usuarioId, CancellationToken ct = default)
@@ -475,7 +499,7 @@ public class ApartadoService : IApartadoService
         a.RechazarPago(abonoId, NombreStaff(staff), _reloj.Ahora, motivo);
 
         await _apartados.GuardarAsync(ct);
-        return a.ToDto();
+        return await MapearAsync(a, ct);
     }
 
     private async Task<Apartado> ObtenerParaRevisarAsync(string apartadoId, Clienta staff, CancellationToken ct)

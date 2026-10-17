@@ -34,7 +34,8 @@ public record LineaApartadoDto(
     decimal Precio,
     decimal Costo,
     int Cantidad,
-    string SucursalOrigen);
+    string SucursalOrigen,
+    string? ImagenUrl = null);
 
 public record AbonoDto(
     string Id,
@@ -85,7 +86,7 @@ public record CorteDiaDto(string Sucursal, string Dia, decimal VentasDia, decima
 
 public record StockBajoItemDto(string ProductoId, string Nombre, string Talla, string ColorNombre, string ColorHex, int Disponible);
 
-public record TopProductoDto(string ProductoId, string Nombre, string Silueta, string ColorHex, int Unidades);
+public record TopProductoDto(string ProductoId, string Nombre, string Silueta, string ColorHex, int Unidades, string? ImagenUrl = null);
 
 public record VentaDiaDto(string Dia, decimal Total);
 

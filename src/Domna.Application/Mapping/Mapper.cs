@@ -80,7 +80,7 @@ public static class Mapper
         c.Hex,
         EnumMap.Familia(c.Familia));
 
-    public static LineaApartadoDto ToDto(this LineaApartado l) => new(
+    public static LineaApartadoDto ToDto(this LineaApartado l, string? imagenUrl = null) => new(
         l.VarianteId,
         l.ProductoId,
         l.Nombre,
@@ -91,7 +91,8 @@ public static class Mapper
         l.Precio,
         l.Costo,
         l.Cantidad,
-        EnumMap.Sucursal(l.SucursalOrigen));
+        EnumMap.Sucursal(l.SucursalOrigen),
+        imagenUrl);
 
     public static AbonoDto ToDto(this Abono a) => new(
         a.Id,
@@ -105,13 +106,14 @@ public static class Mapper
         a.MotivoRechazo,
         a.TieneComprobante);
 
-    public static ApartadoDto ToDto(this Apartado a) => new(
+    /// <param name="fotoDe">Cómo se obtiene la foto de cada línea (la resuelve el servicio, que sí consulta fotos).</param>
+    public static ApartadoDto ToDto(this Apartado a, Func<LineaApartado, string?>? fotoDe = null) => new(
         a.Id,
         a.Folio,
         a.ClientaId,
         a.ClientaNombre,
         a.ClientaTelefono,
-        a.Lineas.Select(l => l.ToDto()).ToList(),
+        a.Lineas.Select(l => l.ToDto(fotoDe?.Invoke(l))).ToList(),
         a.Subtotal,
         a.Penalizacion,
         a.Total,

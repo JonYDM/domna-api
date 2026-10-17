@@ -128,6 +128,9 @@ public class ProductoRepoFake : IProductoRepository
         => Task.FromResult(_productos.Where(p => incluirInactivos || p.Activo)
             .OrderByDescending(p => p.Creado).ToList());
 
+    public Task<List<Producto>> ListarFotosAsync(IReadOnlyCollection<string> ids, CancellationToken ct = default)
+        => Task.FromResult(_productos.Where(p => ids.Contains(p.Id)).ToList());
+
     public Task<Producto?> BuscarPorCodigoBarrasAsync(string codigo, CancellationToken ct = default)
         => Task.FromResult(_productos.FirstOrDefault(p => p.BuscarPorCodigoBarras(codigo) is not null));
 

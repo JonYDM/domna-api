@@ -30,6 +30,16 @@ public class ProductoRepository : IProductoRepository
         return await q.OrderByDescending(p => p.Creado).ToListAsync(ct);
     }
 
+    public async Task<List<Producto>> ListarFotosAsync(IReadOnlyCollection<string> ids, CancellationToken ct = default)
+    {
+        if (ids.Count == 0) return new List<Producto>();
+        return await _db.Productos
+            .Include(p => p.Colores)
+            .Include(p => p.Imagenes)
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync(ct);
+    }
+
     public async Task<Producto?> BuscarPorCodigoBarrasAsync(string codigo, CancellationToken ct = default)
     {
         // El código vive por variante; devolvemos el producto que contiene esa variante.
