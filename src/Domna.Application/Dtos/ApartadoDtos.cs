@@ -123,3 +123,9 @@ public record VerComprobanteInput(string Pin);
 
 /// <summary>Enlace temporal a la imagen del comprobante.</summary>
 public record ComprobanteVistaDto(string Url, int ExpiraEnSegundos);
+
+/// <summary>Una página de resultados. HayMas indica si existe una página siguiente.</summary>
+public record PaginaDto<T>(List<T> Items, int Total, int Pagina, int Tamano, bool HayMas);
+
+/// <summary>Los números de las pestañas de Pedidos: apartados activos y compras por entregar.</summary>
+public record ConteosPedidosDto(int ApartadosActivos, int ComprasPorEntregar);

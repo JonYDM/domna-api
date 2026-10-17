@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Domna.Domain;
 
 namespace Domna.Application.Abstractions;
@@ -22,6 +23,9 @@ public interface IClientaRepository
     /// <summary>Confirma los cambios pendientes en la unidad de trabajo.</summary>
     Task GuardarAsync(CancellationToken ct = default);
 }
+
+/// <summary>Una página de resultados y el total que existe en toda la consulta.</summary>
+public record PaginaDe<T>(List<T> Items, int Total);
 
 /// <summary>Persistencia de productos (prendas) con sus colores y variantes.</summary>
 public interface IProductoRepository
@@ -70,6 +74,17 @@ public interface IApartadoRepository
 {
     Task<Apartado?> ObtenerPorIdAsync(string id, CancellationToken ct = default);
     Task<List<Apartado>> ListarAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Una página de pedidos que cumplen el filtro, con detalle (líneas y abonos) solo de esa página, más el
+    /// total de pedidos que cumplen el filtro. El orden es estable: no repite ni salta pedidos entre páginas.
+    /// </summary>
+    Task<PaginaDe<Apartado>> BuscarAsync(
+        Expression<Func<Apartado, bool>> filtro, bool porVencimiento, int pagina, int tamano, CancellationToken ct = default);
+
+    /// <summary>Cuántos pedidos cumplen el filtro (sin traerlos).</summary>
+    Task<int> ContarAsync(Expression<Func<Apartado, bool>> filtro, CancellationToken ct = default);
+
     Task<List<Apartado>> ListarDeClientaAsync(string clientaId, CancellationToken ct = default);
 
     /// <summary>Apartados ACTIVOS de una clienta (para el límite de apartados simultáneos).</summary>

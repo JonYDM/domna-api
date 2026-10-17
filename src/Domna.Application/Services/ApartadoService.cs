@@ -37,35 +37,33 @@ public class ApartadoService : IApartadoService
 
     // ── Lectura ──
 
-    public async Task<List<ApartadoDto>> ListarAsync(string? estado, string? texto, string? tipo, CancellationToken ct = default)
+    public async Task<List<ApartadoDto>> ListarAsync(string? estado, string? texto, string? tipo, CancellationToken ct = default) =>
+        (await BuscarAsync(estado, texto, tipo, 1, int.MaxValue, ct)).Items;
+
+    public const int TamanoPaginaMaximo = 50;
+
+    public async Task<PaginaDto<ApartadoDto>> BuscarAsync(
+        string? estado, string? texto, string? tipo, int pagina, int tamano, CancellationToken ct = default)
     {
         await ProcesarVencimientosAsync(ct);
-        var lista = await _apartados.ListarAsync(ct);
-        var t = (texto ?? "").Trim().ToLowerInvariant();
-        var especiales = new[] { "por_vencer", "por_entregar", "entregado" };
+        pagina = Math.Max(1, pagina);
+        // int.MaxValue lo usa la lista completa de siempre; las páginas de la app se acotan para no cargar de más.
+        tamano = tamano == int.MaxValue ? tamano : Math.Clamp(tamano, 1, TamanoPaginaMaximo);
 
-        var filtrada = lista.Where(a =>
-        {
-            if (tipo == "compras" && a.Modalidad != ModalidadApartado.Compra) return false;
-            if (tipo == "apartados" && a.Modalidad == ModalidadApartado.Compra) return false;
-            if (estado == "por_vencer" && !PorVencer(a)) return false;
-            if (estado == "por_entregar" && !PorEntregar(a)) return false;
-            if (estado == "entregado" && !(a.Estado == EstadoApartado.Liquidado && a.EstadoEntrega == EstadoEntrega.Entregado)) return false;
-            if (!string.IsNullOrEmpty(estado) && !especiales.Contains(estado) &&
-                EnumMap.EstadoApartado(a.Estado) != estado) return false;
-            if (t.Length > 0)
-            {
-                var hay = $"{a.Folio} {a.ClientaNombre} {a.ClientaTelefono} {string.Join(" ", a.Lineas.Select(l => l.Nombre))}".ToLowerInvariant();
-                if (!hay.Contains(t)) return false;
-            }
-            return true;
-        });
+        var filtro = FiltroPedidos.Combinar(tipo, estado, texto, _reloj.Ahora);
+        var resultado = await _apartados.BuscarAsync(filtro, porVencimiento: estado == "por_vencer", pagina, tamano, ct);
+        var items = await MapearAsync(resultado.Items, ct);
+        var hayMas = tamano != int.MaxValue && (long)pagina * tamano < resultado.Total;
+        return new PaginaDto<ApartadoDto>(items, resultado.Total, pagina, tamano, hayMas);
+    }
 
-        filtrada = estado == "por_vencer"
-            ? filtrada.OrderBy(a => a.VenceEl)
-            : filtrada.OrderByDescending(a => a.Creado);
-
-        return await MapearAsync(filtrada, ct);
+    public async Task<ConteosPedidosDto> ConteosAsync(CancellationToken ct = default)
+    {
+        await ProcesarVencimientosAsync(ct);
+        var ahora = _reloj.Ahora;
+        var activos = await _apartados.ContarAsync(FiltroPedidos.Combinar("apartados", "activo", null, ahora), ct);
+        var porEntregar = await _apartados.ContarAsync(FiltroPedidos.Combinar("compras", "por_entregar", null, ahora), ct);
+        return new ConteosPedidosDto(activos, porEntregar);
     }
 
     public async Task<ApartadoDto> ObtenerAsync(string id, CancellationToken ct = default)

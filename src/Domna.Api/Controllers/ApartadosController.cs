@@ -62,6 +62,23 @@ public class ApartadosController : ControllerBase
         => Ok(await _apartados.ListarAsync(estado, texto, tipo, ct));
 
     /// <summary>Pedidos con pago por confirmar. La cajera ve los que se entregan en su sucursal; la dueña, todos.</summary>
+    /// <summary>
+    /// Pedidos de a poco: filtra y busca en la base de datos y devuelve una página con el total. `pagina`
+    /// empieza en 1 y `tamano` se acota a 50. Es lo que usa la pantalla de Pedidos.
+    /// </summary>
+    [HttpGet("pagina")]
+    [Authorize(Roles = "duena,cajera")]
+    public async Task<ActionResult<PaginaDto<ApartadoDto>>> Pagina(
+        [FromQuery] string? estado, [FromQuery] string? texto, [FromQuery] string? tipo,
+        [FromQuery] int pagina = 1, [FromQuery] int tamano = 20, CancellationToken ct = default)
+        => Ok(await _apartados.BuscarAsync(estado, texto, tipo, pagina, tamano, ct));
+
+    /// <summary>Los números de las pestañas de Pedidos (apartados activos y compras por entregar).</summary>
+    [HttpGet("conteos")]
+    [Authorize(Roles = "duena,cajera")]
+    public async Task<ActionResult<ConteosPedidosDto>> Conteos(CancellationToken ct)
+        => Ok(await _apartados.ConteosAsync(ct));
+
     [HttpGet("por-confirmar")]
     [Authorize(Roles = "duena,cajera")]
     public async Task<ActionResult<List<ApartadoDto>>> PorConfirmar(CancellationToken ct)

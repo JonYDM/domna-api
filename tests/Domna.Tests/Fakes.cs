@@ -233,6 +233,20 @@ public class ApartadoRepoFake : IApartadoRepository
     public Task<List<Apartado>> ListarAsync(CancellationToken ct = default)
         => Task.FromResult(_apartados.OrderByDescending(a => a.Creado).ToList());
 
+    public Task<PaginaDe<Apartado>> BuscarAsync(
+        System.Linq.Expressions.Expression<Func<Apartado, bool>> filtro, bool porVencimiento, int pagina, int tamano, CancellationToken ct = default)
+    {
+        var filtrados = _apartados.AsQueryable().Where(filtro);
+        var ordenados = porVencimiento
+            ? filtrados.OrderBy(a => a.VenceEl).ThenBy(a => a.Id)
+            : filtrados.OrderByDescending(a => a.Creado).ThenBy(a => a.Id);
+        return Task.FromResult(new PaginaDe<Apartado>(
+            ordenados.Skip((pagina - 1) * tamano).Take(tamano).ToList(), filtrados.Count()));
+    }
+
+    public Task<int> ContarAsync(System.Linq.Expressions.Expression<Func<Apartado, bool>> filtro, CancellationToken ct = default)
+        => Task.FromResult(_apartados.AsQueryable().Count(filtro));
+
     public Task<List<Apartado>> ListarDeClientaAsync(string clientaId, CancellationToken ct = default)
         => Task.FromResult(_apartados.Where(a => a.ClientaId == clientaId).OrderByDescending(a => a.Creado).ToList());
 

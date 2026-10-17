@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Domna.Application.Abstractions;
 using Domna.Domain;
 using Domna.Infrastructure.Persistence;
@@ -19,6 +20,38 @@ public class ApartadoRepository : IApartadoRepository
 
     public Task<List<Apartado>> ListarAsync(CancellationToken ct = default) =>
         ConDetalle().OrderByDescending(a => a.Creado).ToListAsync(ct);
+
+    public async Task<PaginaDe<Apartado>> BuscarAsync(
+        Expression<Func<Apartado, bool>> filtro, bool porVencimiento, int pagina, int tamano, CancellationToken ct = default)
+    {
+        var total = await _db.Apartados.Where(filtro).CountAsync(ct);
+        var items = await ConsultaDePagina(filtro, porVencimiento, pagina, tamano).ToListAsync(ct);
+        return new PaginaDe<Apartado>(items, total);
+    }
+
+    /// <summary>
+    /// La consulta de una página, sin ejecutarla. Está aparte para poder comprobar en las pruebas que se traduce
+    /// a SQL de PostgreSQL (el proveedor en memoria acepta cosas que Postgres no).
+    /// </summary>
+    public IQueryable<Apartado> ConsultaDePagina(
+        Expression<Func<Apartado, bool>> filtro, bool porVencimiento, int pagina, int tamano)
+    {
+        var filtrados = _db.Apartados.Where(filtro);
+
+        // El Id desempata: sin él, dos pedidos con la misma fecha podrían repetirse o saltarse entre páginas.
+        var ordenados = porVencimiento
+            ? filtrados.OrderBy(a => a.VenceEl).ThenBy(a => a.Id)
+            : filtrados.OrderByDescending(a => a.Creado).ThenBy(a => a.Id);
+
+        return ordenados
+            .Skip((pagina - 1) * tamano)
+            .Take(tamano)
+            .Include(a => a.Lineas)
+            .Include(a => a.Abonos)
+            .AsSplitQuery();
+    }
+    public Task<int> ContarAsync(Expression<Func<Apartado, bool>> filtro, CancellationToken ct = default) =>
+        _db.Apartados.CountAsync(filtro, ct);
 
     public Task<List<Apartado>> ListarDeClientaAsync(string clientaId, CancellationToken ct = default) =>
         ConDetalle().Where(a => a.ClientaId == clientaId).OrderByDescending(a => a.Creado).ToListAsync(ct);

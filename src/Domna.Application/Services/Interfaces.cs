@@ -52,7 +52,14 @@ public interface IApartadoService
     Task<ApartadoDto> AbonarAsync(RegistrarAbonoInput input, CancellationToken ct = default);
     Task<ApartadoDto> CancelarAsync(string id, CancellationToken ct = default);
     Task<ApartadoDto> AvanzarEntregaAsync(string id, string siguiente, CancellationToken ct = default);
+    /// <summary>Todos los pedidos que cumplen el filtro. La app usa <see cref="BuscarAsync"/>; esta lista completa queda por compatibilidad.</summary>
     Task<List<ApartadoDto>> ListarAsync(string? estado, string? texto, string? tipo, CancellationToken ct = default);
+
+    /// <summary>Una página de pedidos (hasta 50) con el total y si hay más. `pagina` empieza en 1.</summary>
+    Task<PaginaDto<ApartadoDto>> BuscarAsync(string? estado, string? texto, string? tipo, int pagina, int tamano, CancellationToken ct = default);
+
+    /// <summary>Los números de las pestañas de Pedidos.</summary>
+    Task<ConteosPedidosDto> ConteosAsync(CancellationToken ct = default);
     Task<ApartadoDto> ObtenerAsync(string id, CancellationToken ct = default);
     Task<List<ApartadoDto>> ListarDeClientaAsync(string clientaId, CancellationToken ct = default);
 
